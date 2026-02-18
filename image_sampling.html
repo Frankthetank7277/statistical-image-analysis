@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Sampling & Interpolation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --border: #1e2230;
+    --accent: #00e5ff;
+    --accent2: #ff6b6b;
+    --accent3: #a8ff78;
+    --accent4: #ffd166;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    padding: 40px 60px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0d0f14 0%, transparent 100%);
+  }
+
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+  }
+
+  .header p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .nav {
+    display: flex;
+    gap: 4px;
+    padding: 16px 60px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .nav-btn:hover { color: var(--text); border-color: var(--accent); }
+  .nav-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+
+  .sections { padding: 0 60px 80px; }
+
+  .section {
+    display: none;
+    padding-top: 48px;
+  }
+  .section.active { display: block; }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+
+  .section-header h2 {
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .section-header .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  .desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.7;
+    max-width: 680px;
+    margin-bottom: 36px;
+  }
+
+  /* ---- Grid Visualizer ---- */
+  .viz-layout {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 36px;
+  }
+
+  .viz-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .viz-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .arrow-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .arrow {
+    font-size: 1.8rem;
+    color: var(--accent);
+  }
+
+  .arrow-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+
+  /* Pixel Grid */
+  .pixel-grid {
+    display: grid;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .pixel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    transition: all 0.5s ease;
+    border: 1px solid rgba(255,255,255,0.04);
+    position: relative;
+  }
+
+  .pixel.highlight {
+    outline: 2px solid var(--accent2);
+    outline-offset: -2px;
+    z-index: 2;
+  }
+
+  .pixel.selected {
+    outline: 3px solid var(--accent);
+    outline-offset: -2px;
+    z-index: 3;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+
+  .ctrl-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: 5px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+  }
+
+  .ctrl-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+  .ctrl-btn.primary {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+
+  .ctrl-btn.secondary {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border);
+  }
+
+  .ctrl-btn.danger {
+    background: transparent;
+    color: var(--accent2);
+    border-color: var(--accent2);
+  }
+
+  select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    padding: 8px 14px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  /* Info cards */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-top: 28px;
+  }
+
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    border-left: 3px solid;
+  }
+
+  .info-card h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  .info-card p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  /* Formula display */
+  .formula-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent4);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--accent4);
+    line-height: 1.8;
+  }
+
+  .formula-box span.var { color: var(--accent); }
+  .formula-box span.op { color: var(--accent2); }
+  .formula-box span.comment { color: var(--muted); }
+
+  /* Pooling demo */
+  .pool-demo {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+
+  .pool-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pool-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* Comparison strip */
+  .compare-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .compare-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .compare-item .name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text);
+    letter-spacing: 0.06em;
+  }
+
+  .compare-item .quality {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+  }
+
+  /* Legend strip */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .step-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--accent3);
+    margin-bottom: 16px;
+  }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent3); }
+  .dot.pulse { animation: pulse 1.5s ease infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+  canvas { border-radius: 6px; }
+
+  .interp-comparison {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  @media (max-width: 900px) {
+    .header, .nav, .sections { padding-left: 20px; padding-right: 20px; }
+    .viz-layout { grid-template-columns: 1fr; justify-items: center; }
+    .arrow { transform: rotate(90deg); }
+    .interp-comparison { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Image Sampling & Interpolation</h1>
+  <p>// downsampling · upsampling · pooling · interpolation — visual walkthrough</p>
+</div>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showSection('down')">01 / Downsampling</button>
+  <button class="nav-btn" onclick="showSection('up')">02 / Upsampling</button>
+  <button class="nav-btn" onclick="showSection('pool')">03 / Pooling</button>
+  <button class="nav-btn" onclick="showSection('interp')">04 / Interpolation</button>
+</nav>
+
+<div class="sections">
+
+  <!-- ===================== DOWNSAMPLING ===================== -->
+  <section id="sec-down" class="section active">
+    <div class="section-header">
+      <h2 style="color: var(--accent)">Downsampling</h2>
+      <span class="tag" style="background: rgba(0,229,255,0.12); color: var(--accent)">RESOLUTION REDUCTION</span>
+    </div>
+    <p class="desc">
+      Downsampling reduces spatial resolution by discarding pixels. A stride-2 operation keeps every 2nd pixel, halving width and height. The core tradeoff: you lose detail but gain speed and smaller memory footprint.
+    </p>
+
+    <div class="controls">
+      <button class="ctrl-btn primary" onclick="animateDownsample()">▶ Animate</button>
+      <button class="ctrl-btn secondary" onclick="resetDownsample()">↺ Reset</button>
+      <select id="down-factor" onchange="resetDownsample()">
+        <option value="2">Stride = 2 (4×4 → 2×2)</option>
+        <option value="3">Stride = 3 (6×6 → 2×2)</option>
+      </select>
+    </div>
+
+    <div class="step-indicator" id="down-step">
+      <div class="dot"></div>
+      Ready — click Animate to walk through stride sampling
+    </div>
+
+    <div class="viz-layout">
+      <div class="viz-block">
+        <div class="viz-label">Input — 4×4</div>
+        <div id="grid-input-down" class="pixel-grid"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:4px">16 pixels</div>
+      </div>
+      <div class="arrow-block">
+        <div class="arrow">→</div>
+        <div class="arrow-label">stride-2<br>keep 1 of 4</div>
+      </div>
+      <div class="viz-block">
+        <div class="viz-label">Output — 2×2</div>
+        <div id="grid-output-down" class="pixel-grid"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:4px">4 pixels (75% discarded)</div>
+      </div>
+    </div>
+
+    <div class="formula-box">
+      <span class="comment">// output coordinate from input coordinate with stride s</span><br>
+      x_out = floor(<span class="var">x_in</span> / <span class="op">s</span>) &nbsp;&nbsp; <span class="comment">// keep pixel at x=0, 2, 4… (stride=2)</span><br>
+      output[i,j] = input[<span class="var">i</span> <span class="op">*</span> s, <span class="var">j</span> <span class="op">*</span> s] &nbsp;&nbsp; <span class="comment">// direct index pick</span>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card" style="border-left-color: var(--accent)">
+        <h4 style="color: var(--accent)">Why we do it</h4>
+        <p>Reduce compute cost in deep nets. After each conv block, halving spatial dims means 4× fewer multiply-adds in the next layer.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent2)">
+        <h4 style="color: var(--accent2)">The aliasing problem</h4>
+        <p>Naive subsampling causes aliasing — high-frequency detail folds into lower frequencies. Solution: blur first (anti-alias), then sample.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent4)">
+        <h4 style="color: var(--accent4)">In CNNs</h4>
+        <p>Strided convolutions (stride 2+) are the modern way to downsample — they learn what to keep rather than blindly discarding.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== UPSAMPLING ===================== -->
+  <section id="sec-up" class="section">
+    <div class="section-header">
+      <h2 style="color: var(--accent3)">Upsampling</h2>
+      <span class="tag" style="background: rgba(168,255,120,0.12); color: var(--accent3)">RESOLUTION INCREASE</span>
+    </div>
+    <p class="desc">
+      Upsampling increases spatial resolution — the reverse of downsampling. It's used in decoders (U-Net), super-resolution, and segmentation models. Three classic strategies: zero insertion, nearest-neighbor repeat, and learned transposed convolution.
+    </p>
+
+    <div class="controls">
+      <button class="ctrl-btn primary" onclick="animateUpsample()">▶ Animate</button>
+      <button class="ctrl-btn secondary" onclick="resetUpsample()">↺ Reset</button>
+      <select id="up-method" onchange="resetUpsample()">
+        <option value="zeros">Zero insertion (bed of nails)</option>
+        <option value="nearest">Nearest-neighbor repeat</option>
+        <option value="bilinear">Bilinear (preview)</option>
+      </select>
+    </div>
+
+    <div class="step-indicator" id="up-step">
+      <div class="dot"></div>
+      Ready — select method then animate
+    </div>
+
+    <div class="viz-layout">
+      <div class="viz-block">
+        <div class="viz-label">Input — 2×2</div>
+        <div id="grid-input-up" class="pixel-grid"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:4px">4 pixels</div>
+      </div>
+      <div class="arrow-block">
+        <div class="arrow">→</div>
+        <div class="arrow-label">scale ×2<br>4 pixels →</div>
+      </div>
+      <div class="viz-block">
+        <div class="viz-label">Output — 4×4</div>
+        <div id="grid-output-up" class="pixel-grid"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:4px">16 pixels</div>
+      </div>
+    </div>
+
+    <div class="formula-box">
+      <span class="comment">// nearest-neighbor: map each output pixel back to closest input</span><br>
+      x_in = floor(<span class="var">x_out</span> / <span class="op">scale</span>) &nbsp;&nbsp; <span class="comment">// inverse mapping</span><br><br>
+      <span class="comment">// zero insertion: sparse, then convolve to "fill in"</span><br>
+      output[i, j] = input[i/s, j/s] <span class="op">if</span> i%s==0 <span class="op">and</span> j%s==0 <span class="op">else</span> 0
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card" style="border-left-color: var(--accent3)">
+        <h4 style="color: var(--accent3)">Zero insertion</h4>
+        <p>Place original values at sparse positions, fill gaps with 0. Then apply a learned filter to distribute energy — this is how transposed convolutions work.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent)">
+        <h4 style="color: var(--accent)">Nearest neighbor</h4>
+        <p>Each new pixel copies its nearest source pixel. Fast, no learning. Creates blocky output but perfectly invertible without information loss.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent4)">
+        <h4 style="color: var(--accent4)">Transposed conv</h4>
+        <p>Learnable upsampling. Equivalent to zero-insert then convolution. Used in decoders, GANs, and segmentation heads (e.g. U-Net uppath).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== POOLING ===================== -->
+  <section id="sec-pool" class="section">
+    <div class="section-header">
+      <h2 style="color: var(--accent2)">Pooling</h2>
+      <span class="tag" style="background: rgba(255,107,107,0.12); color: var(--accent2)">AGGREGATION</span>
+    </div>
+    <p class="desc">
+      Pooling slides a window over the image and summarizes each region into a single value. Unlike stride-sampling it aggregates — combining neighbor information rather than discarding it. Max pooling and average pooling are the two workhorses.
+    </p>
+
+    <div class="controls">
+      <button class="ctrl-btn primary" onclick="animatePool()">▶ Step through</button>
+      <button class="ctrl-btn secondary" onclick="resetPool()">↺ Reset</button>
+      <select id="pool-type" onchange="resetPool()">
+        <option value="max">Max Pooling (2×2, stride 2)</option>
+        <option value="avg">Average Pooling (2×2, stride 2)</option>
+      </select>
+    </div>
+
+    <div class="step-indicator" id="pool-step">
+      <div class="dot"></div>
+      Ready — step through each 2×2 window
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:rgba(255,107,107,0.5)"></div>
+        active window
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:rgba(0,229,255,0.5)"></div>
+        selected value
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:rgba(168,255,120,0.3)"></div>
+        completed
+      </div>
+    </div>
+
+    <div class="pool-demo">
+      <div class="pool-step">
+        <div class="pool-label">Input — 4×4</div>
+        <div id="grid-pool-in" class="pixel-grid"></div>
+      </div>
+      <div style="display:flex;align-items:center;padding:40px 0;font-size:1.5rem;color:var(--accent2)">→</div>
+      <div class="pool-step">
+        <div class="pool-label">Output — 2×2</div>
+        <div id="grid-pool-out" class="pixel-grid"></div>
+      </div>
+      <div class="pool-step" style="margin-left: 24px">
+        <div class="pool-label">Window detail</div>
+        <div id="pool-detail" style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:1.9;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 18px;min-width:200px"></div>
+      </div>
+    </div>
+
+    <div class="formula-box">
+      <span class="comment">// max pooling over 2×2 window at position (i,j)</span><br>
+      output[i,j] = max(input[<span class="var">2i</span>, <span class="var">2j</span>], input[<span class="var">2i+1</span>, <span class="var">2j</span>], input[<span class="var">2i</span>, <span class="var">2j+1</span>], input[<span class="var">2i+1</span>, <span class="var">2j+1</span>])<br><br>
+      <span class="comment">// average pooling: same window, mean instead</span><br>
+      output[i,j] = (<span class="var">a</span> <span class="op">+</span> <span class="var">b</span> <span class="op">+</span> <span class="var">c</span> <span class="op">+</span> <span class="var">d</span>) <span class="op">/</span> 4
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card" style="border-left-color: var(--accent2)">
+        <h4 style="color: var(--accent2)">Max pooling</h4>
+        <p>Preserves strongest activations. Invariant to small translations — a feature detected anywhere in the window passes through. Preferred in classification.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent)">
+        <h4 style="color: var(--accent)">Average pooling</h4>
+        <p>Smooths by averaging. Retains spatial context. Used in global average pooling (GAP) at network end — collapses entire feature map to a vector.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent3)">
+        <h4 style="color: var(--accent3)">vs. strided conv</h4>
+        <p>Pooling is handcrafted aggregation. Strided convolution learns its own aggregation weights. Modern architectures (ResNet v2+) often prefer strided convs.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent4)">
+        <h4 style="color: var(--accent4)">Translation invariance</h4>
+        <p>Max pooling gives local translation invariance — the detector doesn't care where in the 2×2 window the feature appeared. This is a key design feature.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== INTERPOLATION ===================== -->
+  <section id="sec-interp" class="section">
+    <div class="section-header">
+      <h2 style="color: var(--accent4)">Interpolation</h2>
+      <span class="tag" style="background: rgba(255,209,102,0.12); color: var(--accent4)">VALUE ESTIMATION</span>
+    </div>
+    <p class="desc">
+      Interpolation estimates pixel values between known samples. It's the math behind upsampling, zoom, and rotation. Moving from nearest-neighbor → bilinear → bicubic adds smoothness but also computational cost.
+    </p>
+
+    <div class="controls">
+      <button class="ctrl-btn primary" onclick="renderInterp()">▶ Compare All</button>
+      <button class="ctrl-btn secondary" onclick="resetInterp()">↺ Reset</button>
+    </div>
+
+    <div class="step-indicator" id="interp-step">
+      <div class="dot"></div>
+      Click Compare All to see all four methods side-by-side
+    </div>
+
+    <!-- Canvas comparison -->
+    <div class="interp-comparison" id="interp-compare">
+      <div class="compare-item">
+        <canvas id="cnv-original" width="120" height="120"></canvas>
+        <div class="name">Original</div>
+        <div class="quality" style="color:var(--accent3)">4×4 source</div>
+      </div>
+      <div class="compare-item">
+        <canvas id="cnv-nearest" width="120" height="120"></canvas>
+        <div class="name">Nearest-Neighbor</div>
+        <div class="quality">blocky, fast</div>
+      </div>
+      <div class="compare-item">
+        <canvas id="cnv-bilinear" width="120" height="120"></canvas>
+        <div class="name">Bilinear</div>
+        <div class="quality">smooth, cheap</div>
+      </div>
+      <div class="compare-item">
+        <canvas id="cnv-bicubic" width="120" height="120"></canvas>
+        <div class="name">Bicubic</div>
+        <div class="quality">sharpest edges</div>
+      </div>
+    </div>
+
+    <!-- Bilinear walkthrough -->
+    <h3 style="font-size:1rem;font-weight:700;margin:28px 0 8px;color:var(--accent4)">Bilinear Interpolation — step by step</h3>
+
+    <div class="formula-box">
+      <span class="comment">// to find value at fractional position (x, y) = (0.7, 0.3):</span><br>
+      <span class="comment">// 1. identify surrounding 4 neighbors: Q11, Q12, Q21, Q22</span><br>
+      <span class="comment">// 2. interpolate horizontally twice:</span><br>
+      R1 = Q11 <span class="op">*</span> (1<span class="op">-</span>tx) <span class="op">+</span> Q21 <span class="op">*</span> tx &nbsp;&nbsp; <span class="comment">// top row</span><br>
+      R2 = Q12 <span class="op">*</span> (1<span class="op">-</span>tx) <span class="op">+</span> Q22 <span class="op">*</span> tx &nbsp;&nbsp; <span class="comment">// bottom row</span><br>
+      <span class="comment">// 3. interpolate vertically:</span><br>
+      P = R1 <span class="op">*</span> (1<span class="op">-</span>ty) <span class="op">+</span> R2 <span class="op">*</span> ty &nbsp;&nbsp;&nbsp;&nbsp; <span class="comment">// final value</span>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card" style="border-left-color: var(--muted)">
+        <h4 style="color: var(--text)">Nearest-neighbor</h4>
+        <p>Copy the closest known pixel. Zero math, zero smoothing. Good for segmentation masks where you must preserve discrete labels.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent4)">
+        <h4 style="color: var(--accent4)">Bilinear</h4>
+        <p>Weighted average of 4 neighbors using x/y fractional offsets. Default in PyTorch's F.interpolate. Good balance of quality and speed.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent2)">
+        <h4 style="color: var(--accent2)">Bicubic</h4>
+        <p>16-neighbor polynomial fit. Sharper than bilinear, can overshoot at edges (Runge's phenomenon). Used in super-resolution baselines.</p>
+      </div>
+      <div class="info-card" style="border-left-color: var(--accent3)">
+        <h4 style="color: var(--accent3)">In PyTorch</h4>
+        <p>torch.nn.functional.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False) — drop-in upsampling in any decoder.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ─── Color palette ───────────────────────────────────────────────
+const PALETTE = [
+  '#1a1c2c','#5d275d','#b13e53','#ef7d57',
+  '#ffcd75','#a7f070','#38b764','#257179',
+  '#29366f','#3b5dc9','#41a6f6','#73eff7',
+  '#f4f4f4','#94b0c2','#566c86','#333c57'
+];
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
+}
+
+function luminance(hex) {
+  const [r,g,b] = hexToRgb(hex);
+  return 0.299*r + 0.587*g + 0.114*b;
+}
+
+function textColor(hex) {
+  return luminance(hex) > 128 ? '#0a0c10' : '#e2e8f0';
+}
+
+// ─── Build pixel grid helper ──────────────────────────────────────
+function buildGrid(containerId, size, pixels, cellSize=52) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  el.style.gridTemplateColumns = `repeat(${size}, ${cellSize}px)`;
+  pixels.forEach((px, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'pixel';
+    cell.style.width = cellSize + 'px';
+    cell.style.height = cellSize + 'px';
+    cell.style.background = px.color;
+    cell.style.color = textColor(px.color);
+    cell.textContent = px.val;
+    cell.id = containerId + '-cell-' + i;
+    el.appendChild(cell);
+  });
+}
+
+function setPixel(containerId, i, color, val, cls='') {
+  const cell = document.getElementById(containerId + '-cell-' + i);
+  if (!cell) return;
+  cell.style.background = color;
+  cell.style.color = textColor(color);
+  if (val !== undefined) cell.textContent = val;
+  cell.className = 'pixel ' + cls;
+}
+
+// ─── Sample image data ────────────────────────────────────────────
+const IMG4x4 = [
+  {val:200,color:'#c8c8c8'},{val:180,color:'#b4b4b4'},{val:50,color:'#323232'},{val:30,color:'#1e1e1e'},
+  {val:210,color:'#d2d2d2'},{val:190,color:'#bec0bc'},{val:40,color:'#282828'},{val:20,color:'#141414'},
+  {val:100,color:'#646464'},{val:80,color:'#505050'},{val:220,color:'#dcdcdc'},{val:200,color:'#c8c8c8'},
+  {val:90,color:'#5a5a5a'},{val:70,color:'#464646'},{val:210,color:'#d2d2d2'},{val:190,color:'#bebebe'}
+];
+
+const IMG4x4_COLOR = [
+  {val:'',color:'#3b5dc9'},{val:'',color:'#41a6f6'},{val:'',color:'#ef7d57'},{val:'',color:'#ffcd75'},
+  {val:'',color:'#29366f'},{val:'',color:'#73eff7'},{val:'',color:'#b13e53'},{val:'',color:'#a7f070'},
+  {val:'',color:'#38b764'},{val:'',color:'#257179'},{val:'',color:'#f4f4f4'},{val:'',color:'#94b0c2'},
+  {val:'',color:'#566c86'},{val:'',color:'#5d275d'},{val:'',color:'#ffcd75'},{val:'',color:'#ef7d57'}
+];
+
+// ─── DOWNSAMPLING ─────────────────────────────────────────────────
+let downState = { step: 0, timer: null };
+
+function resetDownsample() {
+  clearTimeout(downState.timer);
+  downState.step = 0;
+  buildGrid('grid-input-down', 4, IMG4x4.map(p=>({...p})), 52);
+  const blanks = Array(4).fill({val:'?',color:'#1e2230'});
+  buildGrid('grid-output-down', 2, blanks, 80);
+  document.getElementById('down-step').innerHTML = '<div class="dot"></div> Ready — click Animate to walk through stride sampling';
+}
+
+resetDownsample();
+
+const DOWN_KEEP = [0,2,8,10]; // stride-2 kept pixels from 4x4
+
+async function animateDownsample() {
+  resetDownsample();
+  await sleep(300);
+  const factor = 2;
+  const steps = [
+    {scan:0,keep:0,outIdx:0,msg:'Scanning (0,0) — stride keeps this one ✓'},
+    {scan:1,keep:null,outIdx:null,msg:'Scanning (0,1) — stride skips this pixel ✗'},
+    {scan:2,keep:2,outIdx:1,msg:'Scanning (0,2) — stride keeps this one ✓'},
+    {scan:3,keep:null,outIdx:null,msg:'Scanning (0,3) — stride skips ✗'},
+    {scan:4,keep:null,outIdx:null,msg:'Row 1 skipped entirely (stride-2) ✗'},
+    {scan:5,keep:null,outIdx:null,msg:'Row 1 skipped ✗'},
+    {scan:6,keep:null,outIdx:null,msg:'Row 1 skipped ✗'},
+    {scan:7,keep:null,outIdx:null,msg:'Row 1 skipped ✗'},
+    {scan:8,keep:8,outIdx:2,msg:'Scanning (2,0) — stride keeps this one ✓'},
+    {scan:9,keep:null,outIdx:null,msg:'Scanning (2,1) — skipped ✗'},
+    {scan:10,keep:10,outIdx:3,msg:'Scanning (2,2) — stride keeps this one ✓'},
+    {scan:11,keep:null,outIdx:null,msg:'Done! 4 of 16 pixels kept (75% discarded)'},
+  ];
+
+  const outData = [IMG4x4[0],IMG4x4[2],IMG4x4[8],IMG4x4[10]];
+  let outFilled = 0;
+
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    // dim all, highlight current scan
+    for (let k=0;k<16;k++) {
+      setPixel('grid-input-down',k, k<=s.scan ? IMG4x4[k].color : '#1e2230', k<=s.scan ? IMG4x4[k].val : '·');
+    }
+    setPixel('grid-input-down', s.scan, IMG4x4[s.scan].color, IMG4x4[s.scan].val, 'highlight');
+
+    if (s.keep !== null) {
+      setPixel('grid-input-down', s.keep, IMG4x4[s.keep].color, IMG4x4[s.keep].val, 'selected');
+      const od = outData[s.outIdx];
+      setPixel('grid-output-down', s.outIdx, od.color, od.val, 'selected');
+    }
+
+    document.getElementById('down-step').innerHTML = `<div class="dot pulse"></div> Step ${i+1} — ${s.msg}`;
+    await sleep(700);
+  }
+}
+
+// ─── UPSAMPLING ───────────────────────────────────────────────────
+const UP_IN = [
+  {val:200,color:'#c8c8c8'},{val:50,color:'#323232'},
+  {val:100,color:'#646464'},{val:220,color:'#dcdcdc'}
+];
+
+function resetUpsample() {
+  buildGrid('grid-input-up', 2, UP_IN.map(p=>({...p})), 80);
+  const blanks = Array(16).fill(null).map(()=>({val:'·',color:'#1e2230'}));
+  buildGrid('grid-output-up', 4, blanks, 52);
+  document.getElementById('up-step').innerHTML = '<div class="dot"></div> Ready — select method then animate';
+}
+
+resetUpsample();
+
+async function animateUpsample() {
+  resetUpsample();
+  const method = document.getElementById('up-method').value;
+  await sleep(200);
+
+  if (method === 'zeros') {
+    document.getElementById('up-step').innerHTML = '<div class="dot pulse"></div> Zero insertion: placing source pixels at stride positions…';
+    const positions = [0,2,8,10]; // positions in 4x4 grid
+    for(let i=0;i<4;i++) {
+      setPixel('grid-input-up', i, UP_IN[i].color, UP_IN[i].val, 'selected');
+      await sleep(400);
+      setPixel('grid-output-up', positions[i], UP_IN[i].color, UP_IN[i].val, 'selected');
+      await sleep(300);
+    }
+    await sleep(500);
+    document.getElementById('up-step').innerHTML = '<div class="dot pulse"></div> Filling gaps with zeros (then a filter would smooth these)…';
+    const zeros = [1,3,4,5,6,7,9,11,12,13,14,15];
+    for(let j of zeros) {
+      setPixel('grid-output-up', j, '#1a2035', '0');
+      await sleep(80);
+    }
+  } else if (method === 'nearest') {
+    document.getElementById('up-step').innerHTML = '<div class="dot pulse"></div> Nearest-neighbor: each output pixel copies nearest source…';
+    // 4x4 output maps to 2x2 input via floor(x/2), floor(y/2)
+    const mapping = [0,0,1,1, 0,0,1,1, 2,2,3,3, 2,2,3,3];
+    for(let i=0;i<16;i++) {
+      const src = mapping[i];
+      setPixel('grid-input-up', src, UP_IN[src].color, UP_IN[src].val, 'selected');
+      setPixel('grid-output-up', i, UP_IN[src].color, UP_IN[src].val, 'highlight');
+      await sleep(120);
+    }
+  } else {
+    document.getElementById('up-step').innerHTML = '<div class="dot pulse"></div> Bilinear: blending neighbors at fractional positions…';
+    const vals = [200,150,100,50, 162,137,113,87, 137,120,103,87, 100,87,75,62];
+    for(let i=0;i<16;i++) {
+      const v = vals[i];
+      const h = Math.round(v).toString(16).padStart(2,'0');
+      const col = `#${h}${h}${h}`;
+      setPixel('grid-output-up', i, col, v, 'highlight');
+      await sleep(120);
+    }
+  }
+
+  document.getElementById('up-step').innerHTML = '<div class="dot"></div> Done! Each output pixel placed by the selected method.';
+}
+
+// ─── POOLING ──────────────────────────────────────────────────────
+const POOL_IN_DATA = [
+  {val:3,color:'#3b5dc9'},{val:1,color:'#29366f'},{val:5,color:'#b13e53'},{val:2,color:'#5d275d'},
+  {val:7,color:'#38b764'},{val:4,color:'#257179'},{val:6,color:'#41a6f6'},{val:8,color:'#73eff7'},
+  {val:2,color:'#566c86'},{val:9,color:'#29366f'},{val:1,color:'#1a1c2c'},{val:3,color:'#333c57'},
+  {val:5,color:'#3b5dc9'},{val:6,color:'#38b764'},{val:4,color:'#257179'},{val:7,color:'#41a6f6'}
+];
+
+function resetPool() {
+  buildGrid('grid-pool-in', 4, POOL_IN_DATA.map(p=>({...p})), 52);
+  const blanks = Array(4).fill(null).map(()=>({val:'?',color:'#1e2230'}));
+  buildGrid('grid-pool-out', 2, blanks, 80);
+  document.getElementById('pool-step').innerHTML = '<div class="dot"></div> Ready — step through each 2×2 window';
+  document.getElementById('pool-detail').innerHTML = 'Click ▶ Step through to begin';
+}
+
+resetPool();
+
+let poolWindowIdx = -1;
+
+const WINDOWS = [
+  {inCells:[0,1,4,5], outIdx:0, label:'Window (0,0)'},
+  {inCells:[2,3,6,7], outIdx:1, label:'Window (0,1)'},
+  {inCells:[8,9,12,13], outIdx:2, label:'Window (1,0)'},
+  {inCells:[10,11,14,15], outIdx:3, label:'Window (1,1)'},
+];
+
+async function animatePool() {
+  const ptype = document.getElementById('pool-type').value;
+  poolWindowIdx++;
+
+  if (poolWindowIdx >= 4) {
+    poolWindowIdx = -1;
+    resetPool();
+    return;
+  }
+
+  const w = WINDOWS[poolWindowIdx];
+  // reset all to base
+  buildGrid('grid-pool-in', 4, POOL_IN_DATA.map(p=>({...p})), 52);
+  // dim completed windows
+  for(let wi=0; wi<poolWindowIdx; wi++) {
+    WINDOWS[wi].inCells.forEach(c => {
+      const cell = document.getElementById('grid-pool-in-cell-'+c);
+      if(cell) cell.style.opacity = '0.3';
+    });
+  }
+
+  // highlight active window
+  const vals = w.inCells.map(i=>POOL_IN_DATA[i].val);
+  let result, maxIdx, detail;
+
+  if(ptype === 'max') {
+    result = Math.max(...vals);
+    maxIdx = w.inCells[vals.indexOf(result)];
+    detail = `<b style="color:var(--accent2)">${w.label}</b><br><br>Values: ${vals.join(', ')}<br><br>max(${vals.join(', ')}) = <span style="color:var(--accent)">${result}</span>`;
+  } else {
+    result = (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
+    detail = `<b style="color:var(--accent4)">${w.label}</b><br><br>Values: ${vals.join(', ')}<br><br>avg = (${vals.join('+')}) / 4<br>= <span style="color:var(--accent)">${result}</span>`;
+  }
+
+  w.inCells.forEach((c,i) => {
+    const isPick = ptype==='max' && c===maxIdx;
+    setPixel('grid-pool-in', c, POOL_IN_DATA[c].color, POOL_IN_DATA[c].val, isPick ? 'selected' : 'highlight');
+  });
+
+  const v = parseFloat(result);
+  const h = Math.min(255,Math.round(v*25)).toString(16).padStart(2,'0');
+  setPixel('grid-pool-out', w.outIdx, `#${h}${h}ff`, result, 'selected');
+  document.getElementById('pool-detail').innerHTML = detail;
+
+  const remaining = 4 - poolWindowIdx - 1;
+  document.getElementById('pool-step').innerHTML = `<div class="dot pulse"></div> ${w.label} → output[${Math.floor(w.outIdx/2)},${w.outIdx%2}] = ${result} (${ptype}). ${remaining>0?remaining+' windows remaining':'Click again to reset'}`;
+}
+
+// ─── INTERPOLATION (canvas) ───────────────────────────────────────
+const SRC_4x4 = [
+  [200,180,50,30],
+  [210,190,40,20],
+  [100,80,220,200],
+  [90,70,210,190]
+];
+
+function drawOriginal(canvas) {
+  const ctx = canvas.getContext('2d');
+  const cw = canvas.width, ch = canvas.height;
+  const pw = cw/4, ph = ch/4;
+  ctx.clearRect(0,0,cw,ch);
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++) {
+    const v = SRC_4x4[r][c];
+    ctx.fillStyle = `rgb(${v},${v},${Math.round(v*1.1)})`;
+    ctx.fillRect(c*pw, r*ph, pw, ph);
+  }
+  ctx.font = '600 9px JetBrains Mono';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++) {
+    const v = SRC_4x4[r][c];
+    ctx.fillStyle = v>128?'#000':'#fff';
+    ctx.fillText(SRC_4x4[r][c], c*pw+pw/2, r*ph+ph/2);
+  }
+}
+
+function bilinearSample(srcX, srcY) {
+  const x0 = Math.floor(srcX), y0 = Math.floor(srcY);
+  const x1 = Math.min(x0+1, 3), y1 = Math.min(y0+1, 3);
+  const tx = srcX - x0, ty = srcY - y0;
+  const q11 = SRC_4x4[y0][x0], q21 = SRC_4x4[y0][x1];
+  const q12 = SRC_4x4[y1][x0], q22 = SRC_4x4[y1][x1];
+  const r1 = q11*(1-tx)+q21*tx;
+  const r2 = q12*(1-tx)+q22*tx;
+  return r1*(1-ty)+r2*ty;
+}
+
+function nearestSample(srcX, srcY) {
+  return SRC_4x4[Math.min(3,Math.round(srcY))][Math.min(3,Math.round(srcX))];
+}
+
+function bicubicWeight(t) {
+  const a = -0.5;
+  const at = Math.abs(t);
+  if(at<=1) return (a+2)*at**3-(a+3)*at**2+1;
+  if(at<2) return a*at**3-5*a*at**2+8*a*at-4*a;
+  return 0;
+}
+
+function bicubicSample(srcX, srcY) {
+  let val = 0;
+  for(let m=-1;m<=2;m++) for(let n=-1;n<=2;n++) {
+    const xi = Math.max(0,Math.min(3,Math.round(srcX)+n));
+    const yi = Math.max(0,Math.min(3,Math.round(srcY)+m));
+    val += SRC_4x4[yi][xi]*bicubicWeight(srcX-xi)*bicubicWeight(srcY-yi);
+  }
+  return Math.max(0,Math.min(255,val));
+}
+
+function drawInterp(canvas, method, scale=30) {
+  const ctx = canvas.getContext('2d');
+  const outSize = 4 * scale;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const imgData = ctx.createImageData(outSize, outSize);
+  for(let py=0;py<outSize;py++) for(let px=0;px<outSize;px++) {
+    const srcX = (px/outSize)*3;
+    const srcY = (py/outSize)*3;
+    let v;
+    if(method==='nearest') v = nearestSample(Math.round(srcX), Math.round(srcY));
+    else if(method==='bilinear') v = bilinearSample(srcX, srcY);
+    else v = bicubicSample(srcX, srcY);
+    const idx = (py*outSize+px)*4;
+    imgData.data[idx] = v;
+    imgData.data[idx+1] = v;
+    imgData.data[idx+2] = Math.min(255,Math.round(v*1.1));
+    imgData.data[idx+3] = 255;
+  }
+  const offscreen = document.createElement('canvas');
+  offscreen.width = outSize; offscreen.height = outSize;
+  offscreen.getContext('2d').putImageData(imgData, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
+}
+
+function renderInterp() {
+  document.getElementById('interp-step').innerHTML = '<div class="dot pulse"></div> Rendering all four methods…';
+  drawOriginal(document.getElementById('cnv-original'));
+  drawInterp(document.getElementById('cnv-nearest'), 'nearest');
+  drawInterp(document.getElementById('cnv-bilinear'), 'bilinear');
+  drawInterp(document.getElementById('cnv-bicubic'), 'bicubic');
+  document.getElementById('interp-step').innerHTML = '<div class="dot"></div> All methods rendered — compare the edge quality and smoothness above';
+}
+
+function resetInterp() {
+  ['cnv-original','cnv-nearest','cnv-bilinear','cnv-bicubic'].forEach(id=>{
+    const ctx = document.getElementById(id).getContext('2d');
+    ctx.clearRect(0,0,120,120);
+    ctx.fillStyle = '#111318';
+    ctx.fillRect(0,0,120,120);
+  });
+  document.getElementById('interp-step').innerHTML = '<div class="dot"></div> Click Compare All to see all four methods side-by-side';
+}
+
+// init interp canvases
+resetInterp();
+
+// ─── Nav ──────────────────────────────────────────────────────────
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ─── Utility ─────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+</script>
+</body>
+</html>
