@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bandlimiting and Sampling Theory - Interactive Walkthrough</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        section {
+            margin-bottom: 60px;
+        }
+        
+        h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        h3 {
+            color: #764ba2;
+            font-size: 1.5em;
+            margin: 30px 0 15px 0;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .interactive-demo {
+            background: #f8f9fa;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 300px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: block;
+            margin: 15px 0;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+            align-items: center;
+        }
+        
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .value-display {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: 600;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
+        
+        .highlight-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .warning-box {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .formula {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .status.good {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.bad {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e83e8c;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+            font-size: 0.95em;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Bandlimiting and Sampling Theory</h1>
+            <p>An Interactive Walkthrough of the Nyquist-Shannon Theorem</p>
+        </header>
+        
+        <div class="content">
+            <section id="intro">
+                <h2>What Is a Signal?</h2>
+                <p>A signal is a function of time (or space). Audio is air pressure over time. An image is light intensity over a 2D spatial grid. In MRI, the signal is magnetization intensity distributed over space.</p>
+                
+                <div class="highlight-box">
+                    <strong>The Core Challenge:</strong> The physical world is continuous, but computers are discrete. Sampling theory is the bridge between them.
+                </div>
+            </section>
+            
+            <section id="frequency">
+                <h2>The Frequency Perspective</h2>
+                <p>Any signal can be decomposed into a sum of sinusoids at different frequencies — this is the Fourier insight. A signal's <strong>spectrum</strong> shows which frequencies are present and how much of each.</p>
+                
+                <div class="interactive-demo">
+                    <h3>Frequency Spectrum Visualization</h3>
+                    <canvas id="spectrumCanvas"></canvas>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #4CAF50;"></div>
+                            <span>Bandlimited Signal</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #FF5722;"></div>
+                            <span>Non-bandlimited Signal</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="bandlimiting">
+                <h2>Bandlimiting: Putting a Ceiling on Frequencies</h2>
+                <p>A signal is <strong>bandlimited</strong> if its spectrum contains no frequencies above some maximum f<sub>max</sub>. This upper boundary is called the <strong>bandwidth</strong>.</p>
+                
+                <div class="grid-container">
+                    <div class="card">
+                        <h4>Bandlimited Signal</h4>
+                        <p>Frequency content stops at f<sub>max</sub>. All energy is contained below this threshold.</p>
+                    </div>
+                    <div class="card">
+                        <h4>Non-bandlimited Signal</h4>
+                        <p>Frequency content extends indefinitely. Contains arbitrarily high frequencies.</p>
+                    </div>
+                </div>
+                
+                <div class="info-box">
+                    <strong>Real-world Examples:</strong>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>Human hearing tops out around 20 kHz</li>
+                        <li>MRI scanners have finite gradient strength limiting spatial resolution</li>
+                        <li>Blurry photographs have attenuated high spatial frequencies</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <section id="sampling">
+                <h2>Sampling: Discretizing Continuous Signals</h2>
+                <p>Sampling means measuring the signal at regular intervals separated by period T. The <strong>sampling rate</strong> is:</p>
+                
+                <div class="formula">
+                    f<sub>s</sub> = 1 / T &nbsp;&nbsp;&nbsp;(samples per second)
+                </div>
+                
+                <div class="interactive-demo">
+                    <h3>Interactive Sampling Demonstration</h3>
+                    <canvas id="samplingCanvas"></canvas>
+                    <div class="controls">
+                        <div class="control-group">
+                            <label>Signal Frequency: <span class="value-display" id="freqValue">5 Hz</span></label>
+                            <input type="range" id="signalFreq" min="1" max="20" value="5" step="0.5">
+                        </div>
+                        <div class="control-group">
+                            <label>Sampling Rate: <span class="value-display" id="samplingValue">20 Hz</span></label>
+                            <input type="range" id="samplingRate" min="5" max="50" value="20" step="1">
+                        </div>
+                    </div>
+                    <div id="samplingStatus" style="margin-top: 20px; font-weight: 600; font-size: 1.1em;"></div>
+                </div>
+            </section>
+            
+            <section id="nyquist">
+                <h2>The Nyquist-Shannon Sampling Theorem</h2>
+                
+                <div class="highlight-box">
+                    <strong>Central Theorem:</strong> A bandlimited signal with maximum frequency f<sub>max</sub> can be perfectly reconstructed from its samples if and only if:
+                    <div class="formula" style="margin-top: 15px; font-size: 1.3em;">
+                        f<sub>s</sub> > 2 · f<sub>max</sub>
+                    </div>
+                </div>
+                
+                <p>The critical threshold <strong>2 · f<sub>max</sub></strong> is called the <strong>Nyquist rate</strong>. The <strong>Nyquist frequency</strong> is f<sub>s</sub> / 2 — the highest frequency you can faithfully represent at a given sampling rate.</p>
+                
+                <h3>Why 2× Is the Magic Number</h3>
+                <p>Sampling a sinusoid at exactly its frequency would hit the same point on every cycle. At slightly less than 2×, you can't distinguish the sinusoid from a lower-frequency one. At just above 2×, you get at least two distinct samples per cycle, which is enough to unambiguously identify the frequency and phase.</p>
+            </section>
+            
+            <section id="aliasing">
+                <h2>Aliasing: When Sampling Goes Wrong</h2>
+                <p><strong>Aliasing</strong> occurs when you sample below the Nyquist rate. High-frequency components "fold over" and masquerade as lower frequencies. The signal is irreversibly corrupted.</p>
+                
+                <div class="interactive-demo">
+                    <h3>Aliasing Demonstration</h3>
+                    <canvas id="aliasingCanvas"></canvas>
+                    <div class="controls">
+                        <div class="control-group">
+                            <label>True Frequency: <span class="value-display" id="trueFreqValue">900 Hz</span></label>
+                            <input type="range" id="trueFreq" min="100" max="1000" value="900" step="50">
+                        </div>
+                        <div class="control-group">
+                            <label>Sampling Rate: <span class="value-display" id="aliasSamplingValue">1000 Hz</span></label>
+                            <input type="range" id="aliasSampling" min="500" max="2000" value="1000" step="50">
+                        </div>
+                    </div>
+                    <div id="aliasInfo" style="margin-top: 20px;"></div>
+                </div>
+                
+                <div class="warning-box">
+                    <strong>Concrete Example:</strong> Sample a 900 Hz tone at 1000 samples/second. The Nyquist frequency is 500 Hz. Since 900 Hz > 500 Hz, the signal aliases. The alias appears at |900 - 1000| = 100 Hz. The 900 Hz tone sounds like 100 Hz!
+                </div>
+                
+                <h3>Aliasing in Images</h3>
+                <p>In 2D imaging (MRI, photography), aliasing creates <strong>Moiré fringes</strong> — interference patterns from undersampled grids. In MRI specifically, aliasing appears as <strong>wrap-around artifact</strong> where anatomy from outside the field of view folds into the image.</p>
+            </section>
+            
+            <section id="antialiasing">
+                <h2>The Anti-Aliasing Solution: Low-Pass Filtering</h2>
+                <p>The standard pipeline is:</p>
+                
+                <div class="formula" style="text-align: left; padding: 20px;">
+                    Continuous signal → Low-pass filter (remove f > f<sub>s</sub>/2) → Sample at rate f<sub>s</sub> → Digital signal
+                </div>
+                
+                <div class="interactive-demo">
+                    <h3>Low-Pass Filter Characteristics</h3>
+                    <canvas id="filterCanvas"></canvas>
+                    <div class="controls">
+                        <div class="control-group">
+                            <label>Filter Type:</label>
+                            <select id="filterType" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ddd;">
+                                <option value="brick">Brick Wall (Ideal)</option>
+                                <option value="steep">-24 dB/octave (4th order)</option>
+                                <option value="gentle">-12 dB/octave (2nd order)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Cutoff Frequency: <span class="value-display" id="cutoffValue">500 Hz</span></label>
+                            <input type="range" id="cutoffFreq" min="100" max="1000" value="500" step="50">
+                        </div>
+                    </div>
+                    <div class="legend" style="margin-top: 20px;">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #2196F3;"></div>
+                            <span>Brick Wall (Ideal)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #FF9800;"></div>
+                            <span>-24 dB/octave</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #4CAF50;"></div>
+                            <span>-12 dB/octave</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <p>By bandlimiting <em>before</em> sampling, you guarantee the Nyquist condition is met. The filter removes high-frequency content that would otherwise alias.</p>
+            </section>
+            
+            <section id="reconstruction">
+                <h2>Reconstruction: Going Back to Continuous</h2>
+                <p>If sampling was done correctly, you can reconstruct the original signal perfectly using <strong>ideal interpolation</strong>:</p>
+                
+                <div class="formula">
+                    x(t) = Σ<sub>n</sub> x[n] · sinc(f<sub>s</sub> · t - n)
+                </div>
+                
+                <p>Each sample is weighted by a sinc function, and summing them all recovers the original. The sinc is the ideal interpolation kernel.</p>
+                
+                <div class="info-box">
+                    In practice, perfect sinc interpolation is computationally expensive (infinite extent), so approximations like cubic or linear interpolation are used instead, at some cost to accuracy.
+                </div>
+            </section>
+            
+            <section id="summary">
+                <h2>Summary</h2>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Concept</th>
+                            <th>Meaning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Bandlimited signal</strong></td>
+                            <td>No frequency content above f<sub>max</sub></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sampling rate f<sub>s</sub></strong></td>
+                            <td>How many samples per second</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Nyquist rate</strong></td>
+                            <td>Minimum safe sampling rate = 2·f<sub>max</sub></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Nyquist frequency</strong></td>
+                            <td>Maximum faithfully representable frequency = f<sub>s</sub>/2</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Aliasing</strong></td>
+                            <td>High-frequency content folding into lower frequencies when undersampled</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Anti-aliasing filter</strong></td>
+                            <td>Low-pass filter applied before sampling to prevent aliasing</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="highlight-box">
+                    <strong>Core Insight:</strong> Sampling is lossless if and only if you respect the Nyquist criterion. Everything else — aliasing, reconstruction error, Gibbs ringing — flows from violating or honoring that one constraint.
+                </div>
+            </section>
+            
+            <section id="mri">
+                <h2>Connection to MRI and DFT Work</h2>
+                <p>When you compute a 2D DFT on an MRI image, you're working in the spatial frequency domain — this is literally <em>k</em>-space in MRI.</p>
+                
+                <div class="grid-container">
+                    <div class="card">
+                        <h4>Pixel Spacing</h4>
+                        <p>Determines the highest spatial frequency you sampled (Nyquist frequency in k-space)</p>
+                    </div>
+                    <div class="card">
+                        <h4>Field of View</h4>
+                        <p>Determines your frequency resolution in k-space</p>
+                    </div>
+                    <div class="card">
+                        <h4>k-Space Truncation</h4>
+                        <p>Not collecting all frequencies causes Gibbs ringing</p>
+                    </div>
+                    <div class="card">
+                        <h4>Zero-Padding</h4>
+                        <p>In spatial domain interpolates in frequency domain, and vice versa</p>
+                    </div>
+                </div>
+                
+                <p>The sampling theorem guarantees that as long as the MRI scanner collected enough k-space lines (sampled at or above Nyquist), the image reconstruction is faithful to the true anatomy.</p>
+            </section>
+        </div>
+    </div>
+    
+    <script>
+        // Spectrum Canvas
+        const spectrumCanvas = document.getElementById('spectrumCanvas');
+        const spectrumCtx = spectrumCanvas.getContext('2d');
+        
+        function drawSpectrum() {
+            const width = spectrumCanvas.width = spectrumCanvas.offsetWidth;
+            const height = spectrumCanvas.height = 300;
+            
+            spectrumCtx.clearRect(0, 0, width, height);
+            
+            // Draw axes
+            spectrumCtx.strokeStyle = '#333';
+            spectrumCtx.lineWidth = 2;
+            spectrumCtx.beginPath();
+            spectrumCtx.moveTo(50, height - 50);
+            spectrumCtx.lineTo(width - 30, height - 50);
+            spectrumCtx.moveTo(50, height - 50);
+            spectrumCtx.lineTo(50, 30);
+            spectrumCtx.stroke();
+            
+            // Labels
+            spectrumCtx.fillStyle = '#333';
+            spectrumCtx.font = '14px Arial';
+            spectrumCtx.fillText('Amplitude', 50, 20);
+            spectrumCtx.fillText('Frequency', width - 100, height - 20);
+            spectrumCtx.fillText('0', 40, height - 35);
+            
+            // Bandlimited signal (green)
+            spectrumCtx.fillStyle = '#4CAF50';
+            const fmax = width * 0.6;
+            spectrumCtx.fillRect(60, 80, fmax - 60, height - 130);
+            spectrumCtx.fillStyle = '#333';
+            spectrumCtx.font = '12px Arial';
+            spectrumCtx.fillText('f_max', fmax - 10, height - 35);
+            
+            // Non-bandlimited signal (red, decaying)
+            spectrumCtx.fillStyle = '#FF5722';
+            for (let x = 60; x < width - 30; x += 5) {
+                const h = (height - 130) * Math.exp(-0.002 * (x - 60));
+                spectrumCtx.fillRect(x, 80, 5, h);
+            }
+        }
+        
+        // Sampling Canvas
+        const samplingCanvas = document.getElementById('samplingCanvas');
+        const samplingCtx = samplingCanvas.getContext('2d');
+        const signalFreqSlider = document.getElementById('signalFreq');
+        const samplingRateSlider = document.getElementById('samplingRate');
+        const freqValue = document.getElementById('freqValue');
+        const samplingValue = document.getElementById('samplingValue');
+        const samplingStatus = document.getElementById('samplingStatus');
+        
+        function drawSampling() {
+            const width = samplingCanvas.width = samplingCanvas.offsetWidth;
+            const height = samplingCanvas.height = 300;
+            const signalFreq = parseFloat(signalFreqSlider.value);
+            const samplingRate = parseFloat(samplingRateSlider.value);
+            
+            freqValue.textContent = signalFreq + ' Hz';
+            samplingValue.textContent = samplingRate + ' Hz';
+            
+            samplingCtx.clearRect(0, 0, width, height);
+            
+            // Draw axes
+            samplingCtx.strokeStyle = '#333';
+            samplingCtx.lineWidth = 2;
+            samplingCtx.beginPath();
+            samplingCtx.moveTo(50, height / 2);
+            samplingCtx.lineTo(width - 30, height / 2);
+            samplingCtx.stroke();
+            
+            // Draw continuous signal
+            samplingCtx.strokeStyle = '#2196F3';
+            samplingCtx.lineWidth = 2;
+            samplingCtx.beginPath();
+            for (let x = 50; x < width - 30; x++) {
+                const t = (x - 50) / (width - 80);
+                const y = height / 2 - 80 * Math.sin(2 * Math.PI * signalFreq * t);
+                if (x === 50) {
+                    samplingCtx.moveTo(x, y);
+                } else {
+                    samplingCtx.lineTo(x, y);
+                }
+            }
+            samplingCtx.stroke();
+            
+            // Draw samples
+            const numSamples = Math.floor(samplingRate);
+            samplingCtx.fillStyle = '#FF5722';
+            for (let i = 0; i <= numSamples; i++) {
+                const t = i / samplingRate;
+                const x = 50 + t * (width - 80);
+                const y = height / 2 - 80 * Math.sin(2 * Math.PI * signalFreq * t);
+                samplingCtx.beginPath();
+                samplingCtx.arc(x, y, 5, 0, 2 * Math.PI);
+                samplingCtx.fill();
+            }
+            
+            // Status
+            const nyquistFreq = samplingRate / 2;
+            const nyquistRate = 2 * signalFreq;
+            
+            if (samplingRate > nyquistRate) {
+                samplingStatus.innerHTML = `<span class="status good">✓ Nyquist condition MET</span> (f<sub>s</sub> = ${samplingRate} Hz > 2·f<sub>max</sub> = ${nyquistRate} Hz)<br>Nyquist frequency: ${nyquistFreq} Hz`;
+            } else {
+                samplingStatus.innerHTML = `<span class="status bad">✗ Nyquist condition VIOLATED</span> (f<sub>s</sub> = ${samplingRate} Hz ≤ 2·f<sub>max</sub> = ${nyquistRate} Hz)<br>Aliasing will occur!`;
+            }
+        }
+        
+        // Aliasing Canvas
+        const aliasingCanvas = document.getElementById('aliasingCanvas');
+        const aliasingCtx = aliasingCanvas.getContext('2d');
+        const trueFreqSlider = document.getElementById('trueFreq');
+        const aliasSamplingSlider = document.getElementById('aliasSampling');
+        const trueFreqValue = document.getElementById('trueFreqValue');
+        const aliasSamplingValue = document.getElementById('aliasSamplingValue');
+        const aliasInfo = document.getElementById('aliasInfo');
+        
+        function drawAliasing() {
+            const width = aliasingCanvas.width = aliasingCanvas.offsetWidth;
+            const height = aliasingCanvas.height = 300;
+            const trueFreq = parseFloat(trueFreqSlider.value);
+            const samplingRate = parseFloat(aliasSamplingSlider.value);
+            
+            trueFreqValue.textContent = trueFreq + ' Hz';
+            aliasSamplingValue.textContent = samplingRate + ' Hz';
+            
+            aliasingCtx.clearRect(0, 0, width, height);
+            
+            // Draw axes
+            aliasingCtx.strokeStyle = '#333';
+            aliasingCtx.lineWidth = 2;
+            aliasingCtx.beginPath();
+            aliasingCtx.moveTo(50, height / 2);
+            aliasingCtx.lineTo(width - 30, height / 2);
+            aliasingCtx.stroke();
+            
+            // Draw true signal (high frequency)
+            aliasingCtx.strokeStyle = '#2196F3';
+            aliasingCtx.lineWidth = 1;
+            aliasingCtx.setLineDash([5, 5]);
+            aliasingCtx.beginPath();
+            for (let x = 50; x < width - 30; x++) {
+                const t = (x - 50) / (width - 80) * 2;
+                const y = height / 2 - 70 * Math.sin(2 * Math.PI * trueFreq / 1000 * t);
+                if (x === 50) {
+                    aliasingCtx.moveTo(x, y);
+                } else {
+                    aliasingCtx.lineTo(x, y);
+                }
+            }
+            aliasingCtx.stroke();
+            aliasingCtx.setLineDash([]);
+            
+            // Calculate alias frequency
+            const nyquist = samplingRate / 2;
+            let aliasFreq = trueFreq % samplingRate;
+            if (aliasFreq > nyquist) {
+                aliasFreq = samplingRate - aliasFreq;
+            }
+            
+            // Draw aliased signal (what we perceive)
+            aliasingCtx.strokeStyle = '#FF5722';
+            aliasingCtx.lineWidth = 3;
+            aliasingCtx.beginPath();
+            for (let x = 50; x < width - 30; x++) {
+                const t = (x - 50) / (width - 80) * 2;
+                const y = height / 2 - 70 * Math.sin(2 * Math.PI * aliasFreq / 1000 * t);
+                if (x === 50) {
+                    aliasingCtx.moveTo(x, y);
+                } else {
+                    aliasingCtx.lineTo(x, y);
+                }
+            }
+            aliasingCtx.stroke();
+            
+            // Draw samples
+            const numSamples = Math.floor(samplingRate / 100);
+            aliasingCtx.fillStyle = '#4CAF50';
+            for (let i = 0; i <= numSamples; i++) {
+                const t = i / (samplingRate / 1000) * 2;
+                const x = 50 + (i / numSamples) * (width - 80);
+                const y = height / 2 - 70 * Math.sin(2 * Math.PI * trueFreq / 1000 * t);
+                aliasingCtx.beginPath();
+                aliasingCtx.arc(x, y, 5, 0, 2 * Math.PI);
+                aliasingCtx.fill();
+            }
+            
+            // Info
+            if (trueFreq > nyquist) {
+                aliasInfo.innerHTML = `
+                    <div class="warning-box">
+                        <strong>Aliasing Detected!</strong><br>
+                        True frequency: ${trueFreq} Hz (blue dashed)<br>
+                        Nyquist frequency: ${nyquist} Hz<br>
+                        Alias frequency: ${aliasFreq.toFixed(0)} Hz (red solid)<br>
+                        The ${trueFreq} Hz signal appears as ${aliasFreq.toFixed(0)} Hz after sampling!
+                    </div>
+                `;
+            } else {
+                aliasInfo.innerHTML = `
+                    <div class="info-box">
+                        <strong>No Aliasing</strong><br>
+                        True frequency: ${trueFreq} Hz is below Nyquist frequency: ${nyquist} Hz<br>
+                        Signal is correctly sampled.
+                    </div>
+                `;
+            }
+        }
+        
+        // Filter Canvas
+        const filterCanvas = document.getElementById('filterCanvas');
+        const filterCtx = filterCanvas.getContext('2d');
+        const filterTypeSelect = document.getElementById('filterType');
+        const cutoffFreqSlider = document.getElementById('cutoffFreq');
+        const cutoffValue = document.getElementById('cutoffValue');
+        
+        function drawFilter() {
+            const width = filterCanvas.width = filterCanvas.offsetWidth;
+            const height = filterCanvas.height = 300;
+            const cutoff = parseFloat(cutoffFreqSlider.value);
+            const filterType = filterTypeSelect.value;
+            
+            cutoffValue.textContent = cutoff + ' Hz';
+            
+            filterCtx.clearRect(0, 0, width, height);
+            
+            // Draw axes
+            filterCtx.strokeStyle = '#333';
+            filterCtx.lineWidth = 2;
+            filterCtx.beginPath();
+            filterCtx.moveTo(50, height - 50);
+            filterCtx.lineTo(width - 30, height - 50);
+            filterCtx.moveTo(50, height - 50);
+            filterCtx.lineTo(50, 30);
+            filterCtx.stroke();
+            
+            // Labels
+            filterCtx.fillStyle = '#333';
+            filterCtx.font = '14px Arial';
+            filterCtx.fillText('Amplitude (dB)', 50, 20);
+            filterCtx.fillText('Frequency (Hz)', width - 150, height - 20);
+            filterCtx.fillText('0', 40, height - 35);
+            filterCtx.fillText('1000', width - 50, height - 35);
+            
+            const cutoffX = 50 + (cutoff / 1000) * (width - 80);
+            
+            // Draw cutoff line
+            filterCtx.strokeStyle = '#999';
+            filterCtx.setLineDash([5, 5]);
+            filterCtx.beginPath();
+            filterCtx.moveTo(cutoffX, 30);
+            filterCtx.lineTo(cutoffX, height - 50);
+            filterCtx.stroke();
+            filterCtx.setLineDash([]);
+            filterCtx.fillText(cutoff + ' Hz', cutoffX - 20, height - 35);
+            
+            // Draw 2f line (Nyquist rate)
+            const nyquistX = 50 + ((cutoff * 2) / 1000) * (width - 80);
+            if (nyquistX < width - 30) {
+                filterCtx.strokeStyle = '#FF5722';
+                filterCtx.setLineDash([2, 2]);
+                filterCtx.beginPath();
+                filterCtx.moveTo(nyquistX, 30);
+                filterCtx.lineTo(nyquistX, height - 50);
+                filterCtx.stroke();
+                filterCtx.setLineDash([]);
+                filterCtx.fillStyle = '#FF5722';
+                filterCtx.fillText('2f (' + (cutoff * 2) + ' Hz)', nyquistX - 30, 45);
+            }
+            
+            // Draw filters
+            filterCtx.lineWidth = 3;
+            
+            // Brick wall
+            filterCtx.strokeStyle = '#2196F3';
+            filterCtx.beginPath();
+            filterCtx.moveTo(50, 80);
+            filterCtx.lineTo(cutoffX, 80);
+            filterCtx.lineTo(cutoffX, height - 50);
+            filterCtx.lineTo(width - 30, height - 50);
+            filterCtx.stroke();
+            
+            // -24 dB/octave
+            filterCtx.strokeStyle = '#FF9800';
+            filterCtx.beginPath();
+            filterCtx.moveTo(50, 80);
+            for (let x = 50; x < width - 30; x++) {
+                const f = (x - 50) / (width - 80) * 1000;
+                let y;
+                if (f < cutoff * 0.7) {
+                    y = 80;
+                } else {
+                    const octaves = Math.log2(f / (cutoff * 0.7));
+                    const attenuation = octaves * 24 * 3; // scaled for visualization
+                    y = 80 + attenuation;
+                    if (y > height - 50) y = height - 50;
+                }
+                if (x === 50) {
+                    filterCtx.moveTo(x, y);
+                } else {
+                    filterCtx.lineTo(x, y);
+                }
+            }
+            filterCtx.stroke();
+            
+            // -12 dB/octave
+            filterCtx.strokeStyle = '#4CAF50';
+            filterCtx.beginPath();
+            filterCtx.moveTo(50, 80);
+            for (let x = 50; x < width - 30; x++) {
+                const f = (x - 50) / (width - 80) * 1000;
+                let y;
+                if (f < cutoff * 0.5) {
+                    y = 80;
+                } else {
+                    const octaves = Math.log2(f / (cutoff * 0.5));
+                    const attenuation = octaves * 12 * 3; // scaled for visualization
+                    y = 80 + attenuation;
+                    if (y > height - 50) y = height - 50;
+                }
+                if (x === 50) {
+                    filterCtx.moveTo(x, y);
+                } else {
+                    filterCtx.lineTo(x, y);
+                }
+            }
+            filterCtx.stroke();
+        }
+        
+        // Event listeners
+        signalFreqSlider.addEventListener('input', drawSampling);
+        samplingRateSlider.addEventListener('input', drawSampling);
+        trueFreqSlider.addEventListener('input', drawAliasing);
+        aliasSamplingSlider.addEventListener('input', drawAliasing);
+        filterTypeSelect.addEventListener('change', drawFilter);
+        cutoffFreqSlider.addEventListener('input', drawFilter);
+        
+        // Initial draws
+        window.addEventListener('load', () => {
+            drawSpectrum();
+            drawSampling();
+            drawAliasing();
+            drawFilter();
+        });
+        
+        window.addEventListener('resize', () => {
+            drawSpectrum();
+            drawSampling();
+            drawAliasing();
+            drawFilter();
+        });
+    </script>
+</body>
+</html>
