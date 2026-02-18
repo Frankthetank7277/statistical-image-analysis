@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fourier Transform: A Visual Walkthrough</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a28;
+    --border: #2a2a3f;
+    --accent1: #00e5ff;
+    --accent2: #ff3d7f;
+    --accent3: #a78bfa;
+    --accent4: #34d399;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --gold: #fbbf24;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    overflow-x: hidden;
+    line-height: 1.7;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    overflow: hidden;
+  }
+
+  .hero-canvas-wrap {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  #heroCanvas {
+    width: 100%;
+    height: 100%;
+    opacity: 0.35;
+  }
+
+  .hero-content { position: relative; z-index: 1; }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent1);
+    border: 1px solid var(--accent1);
+    padding: 0.3rem 0.9rem;
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(2.5rem, 6vw, 5rem);
+    line-height: 1.05;
+    margin-bottom: 1rem;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  h1 span { color: var(--accent1); }
+
+  .hero-sub {
+    font-size: 0.9rem;
+    color: var(--muted);
+    max-width: 500px;
+    margin: 0 auto 2.5rem;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .scroll-hint {
+    animation: fadeUp 0.6s 0.3s ease both, bounce 2s 1s ease-in-out infinite;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+  }
+
+  .scroll-hint::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(to bottom, var(--accent1), transparent);
+    margin: 0.5rem auto 0;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(8px); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SECTIONS ── */
+  main { position: relative; z-index: 1; }
+
+  .section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 5rem 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .section-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 0.6rem;
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+    margin-bottom: 1.5rem;
+    line-height: 1.15;
+  }
+
+  h2 .hl { color: var(--accent2); }
+  h2 .hl2 { color: var(--accent3); }
+  h2 .hl3 { color: var(--accent4); }
+
+  p { color: #c4cfe0; margin-bottom: 1.2rem; font-size: 0.88rem; }
+
+  .formula-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent1);
+    padding: 1.4rem 1.8rem;
+    border-radius: 4px;
+    margin: 1.8rem 0;
+    font-size: 0.85rem;
+  }
+
+  .formula-box.ift { border-left-color: var(--accent2); }
+  .formula-box.fft { border-left-color: var(--accent3); }
+
+  .formula-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.7rem;
+  }
+
+  .formula {
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    color: var(--accent1);
+    line-height: 2;
+  }
+
+  .formula.ift { color: var(--accent2); }
+  .formula.fft { color: var(--accent3); }
+
+  .formula sub, .formula sup { font-size: 0.65em; }
+
+  .formula-note {
+    margin-top: 0.8rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── CANVAS DEMOS ── */
+  .demo-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+  }
+
+  .demo-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .demo-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    border-radius: 3px;
+    background: #07070d;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.2rem;
+    align-items: center;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .control-group label { white-space: nowrap; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 120px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent1);
+    cursor: pointer;
+  }
+
+  .val-display {
+    color: var(--accent1);
+    font-size: 0.75rem;
+    min-width: 2rem;
+    text-align: right;
+  }
+
+  button.pill {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  button.pill:hover, button.pill.active {
+    border-color: var(--accent1);
+    color: var(--accent1);
+  }
+
+  button.pill.ift:hover, button.pill.ift.active {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  /* ── ANALOGY CARDS ── */
+  .card-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.2rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: var(--accent3); }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent3);
+  }
+
+  .card-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .card p { font-size: 0.78rem; color: var(--muted); margin: 0; }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    margin: 2rem 0;
+  }
+
+  .compare-table th {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-align: left;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .compare-table td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid rgba(42,42,63,0.5);
+    vertical-align: top;
+    color: #c4cfe0;
+    line-height: 1.5;
+  }
+
+  .compare-table tr:last-child td { border-bottom: none; }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .tag.ft { background: rgba(0,229,255,0.15); color: var(--accent1); }
+  .tag.ift { background: rgba(255,61,127,0.15); color: var(--accent2); }
+  .tag.fft { background: rgba(167,139,250,0.15); color: var(--accent3); }
+
+  /* ── STEPWISE ── */
+  .steps { margin: 2rem 0; }
+
+  .step {
+    display: flex;
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 1.1rem;
+    top: 2.4rem;
+    bottom: -1.5rem;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .step-num {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--accent3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: var(--accent3);
+    flex-shrink: 0;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+  }
+
+  .step-body h4 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .step-body p { font-size: 0.82rem; margin: 0; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    padding: 3rem 2rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  footer span { color: var(--accent1); }
+</style>
+</head>
+<body>
+
+<!-- ══ HERO ══════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-canvas-wrap">
+    <canvas id="heroCanvas"></canvas>
+  </div>
+  <div class="hero-content">
+    <div class="badge">Signal Processing — Visual Walkthrough</div>
+    <h1>The <span>Fourier</span><br>Universe</h1>
+    <p class="hero-sub">FT · IFT · FFT — from spinning circles to fast algorithms. An interactive guide built for deep understanding.</p>
+    <div class="scroll-hint">scroll to explore</div>
+  </div>
+</section>
+
+<main>
+
+<!-- ══ SECTION 1 — INTUITION ═══════════════════════════ -->
+<section class="section">
+  <div class="section-label">01 — The Big Idea</div>
+  <h2>Everything is <span class="hl">Sines</span> &amp; Cosines</h2>
+
+  <p>In 1822, Joseph Fourier made a stunning claim: <em>any</em> periodic signal — no matter how jagged or complex — can be decomposed into a sum of simple sinusoidal waves. This wasn't just elegant mathematics. It became the backbone of audio, imaging, communications, and medical imaging.</p>
+
+  <p>Think of it like a musical chord. A chord sounds complex, but it's really just multiple pure tones (frequencies) playing at once. A spectrum analyzer separates those tones. The Fourier Transform is exactly that — a universal spectrum analyzer for any signal.</p>
+
+  <div class="card-row">
+    <div class="card">
+      <div class="card-icon">🎵</div>
+      <h3>Audio</h3>
+      <p>MP3 compression uses FT to drop inaudible frequencies, shrinking file size 10×.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🧠</div>
+      <h3>MRI</h3>
+      <p>Raw MRI data is collected in frequency space (k-space). IFT reconstructs the image you see.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📡</div>
+      <h3>Wireless</h3>
+      <p>Your phone separates channels by frequency — FT is doing that separation thousands of times per second.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔬</div>
+      <h3>Biomedical</h3>
+      <p>Spatial filters on tissue images (like your BIOE 484 brain MRI work) live in Fourier space.</p>
+    </div>
+  </div>
+
+  <!-- DEMO 1: Sum of Sinusoids -->
+  <div class="demo-wrap">
+    <div class="demo-title">LIVE DEMO — Build a Signal from Sines</div>
+    <canvas id="sineCanvas" height="200"></canvas>
+    <div class="controls">
+      <div class="control-group">
+        <label>Harmonics</label>
+        <input type="range" id="harmonics" min="1" max="15" value="1">
+        <span class="val-display" id="harmonicsVal">1</span>
+      </div>
+      <button class="pill active" id="btnSquare">Square Wave</button>
+      <button class="pill" id="btnSaw">Sawtooth</button>
+      <button class="pill" id="btnTri">Triangle</button>
+    </div>
+  </div>
+
+  <p>Watch the approximation improve as you add harmonics. A square wave is literally an infinite sum of odd-numbered sine harmonics: sin(x) + ⅓sin(3x) + ⅕sin(5x) + … This is exactly what the Fourier Transform reveals.</p>
+</section>
+
+<!-- ══ SECTION 2 — FT ═══════════════════════════════════ -->
+<section class="section">
+  <div class="section-label">02 — The Fourier Transform</div>
+  <h2>The <span class="hl">Forward</span> Transform: Time → Frequency</h2>
+
+  <p>The Fourier Transform decomposes a time-domain signal <em>f(t)</em> into its constituent frequencies. The result is a complex-valued function of frequency — its magnitude tells you <em>how much</em> of each frequency is present, its phase tells you the <em>timing</em>.</p>
+
+  <div class="formula-box">
+    <div class="formula-title">CONTINUOUS FOURIER TRANSFORM</div>
+    <div class="formula">F(ξ) = ∫<sub>-∞</sub><sup>+∞</sup> f(t) · e<sup>-i2πξt</sup> dt</div>
+    <div class="formula-note">
+      <strong style="color:#e2e8f0">Breaking it down:</strong><br>
+      • <span style="color:var(--accent1)">F(ξ)</span> — the spectrum: how much frequency ξ is in the signal<br>
+      • <span style="color:var(--accent1)">f(t)</span> — the input signal in the time domain<br>
+      • <span style="color:var(--accent1)">e<sup>-i2πξt</sup></span> — a rotating complex exponential (= cos(2πξt) − i·sin(2πξt))<br>
+      • The integral is a dot product: how much does f(t) "look like" a wave at frequency ξ?
+    </div>
+  </div>
+
+  <p>The key insight: <code>e<sup>-i2πξt</sup></code> is a unit circle spinner in the complex plane. When you multiply your signal by it and integrate, you're essentially asking: "if I wrap my signal around this spinning wheel, where does the average mass land?" A strong frequency means the mass bunches up — giving a large |F(ξ)|.</p>
+
+  <!-- DEMO 2: Spectrum Analyzer -->
+  <div class="demo-wrap">
+    <div class="demo-title">LIVE DEMO — Frequency Spectrum</div>
+    <canvas id="spectrumCanvas" height="220"></canvas>
+    <div class="controls">
+      <div class="control-group">
+        <label>Signal Type</label>
+      </div>
+      <button class="pill active" id="btnSin1">Pure 2Hz</button>
+      <button class="pill" id="btnSin2">2Hz + 5Hz</button>
+      <button class="pill" id="btnSin3">2+5+11Hz</button>
+      <button class="pill" id="btnChirp">Chirp</button>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>Probe with a frequency</h4>
+        <p>Choose a candidate frequency ξ. Wrap the signal around a circle spinning at ξ revolutions per unit time.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>Measure alignment</h4>
+        <p>Compute the integral (average position of the wound-up signal). If ξ matches a real frequency in the signal, the wound signal clusters on one side — giving a large value.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>Repeat for all ξ</h4>
+        <p>Do this for every frequency. The result is F(ξ) — the complete frequency spectrum. Each value is complex: magnitude = amplitude, angle = phase.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECTION 3 — IFT ══════════════════════════════════ -->
+<section class="section">
+  <div class="section-label">03 — The Inverse Fourier Transform</div>
+  <h2>The <span class="hl2">Inverse</span> Transform: Frequency → Time</h2>
+
+  <p>The Inverse Fourier Transform (IFT) goes the other direction: given a spectrum F(ξ), reconstruct the original signal f(t). It literally adds up an infinite number of complex sinusoids, each weighted by its spectral value.</p>
+
+  <div class="formula-box ift">
+    <div class="formula-title">INVERSE FOURIER TRANSFORM</div>
+    <div class="formula ift">f(t) = ∫<sub>-∞</sub><sup>+∞</sup> F(ξ) · e<sup>+i2πξt</sup> dξ</div>
+    <div class="formula-note">
+      <strong style="color:#e2e8f0">Key differences from the forward transform:</strong><br>
+      • The exponent is <span style="color:var(--accent2)">+i2πξt</span> (note the + sign — spinning backwards)<br>
+      • We integrate over <span style="color:var(--accent2)">frequency ξ</span>, not time t<br>
+      • F(ξ) weights each sinusoidal component<br>
+      • Mathematically guaranteed to exactly recover f(t) (Fourier Inversion Theorem)
+    </div>
+  </div>
+
+  <p>This is where MRI becomes magical. Your scanner never directly measures image pixels — it measures the Fourier Transform of the image (called <strong>k-space</strong>). The IFT is then applied computationally to reconstruct the anatomical image. If k-space is corrupted or undersampled, the reconstructed image degrades — which is the core challenge in accelerated MRI.</p>
+
+  <!-- DEMO 3: IFT Reconstruction -->
+  <div class="demo-wrap">
+    <div class="demo-title">LIVE DEMO — IFT Reconstruction (Frequency → Time)</div>
+    <canvas id="iftCanvas" height="220"></canvas>
+    <div class="controls">
+      <div class="control-group">
+        <label>Freq. components</label>
+        <input type="range" id="iftFreqs" min="1" max="30" value="5">
+        <span class="val-display" id="iftFreqsVal">5</span>
+      </div>
+      <div class="control-group">
+        <label>Noise</label>
+        <input type="range" id="iftNoise" min="0" max="50" value="0">
+        <span class="val-display" id="iftNoiseVal">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <p>Increasing noise in the frequency domain (simulating corrupted k-space) corrupts the reconstructed signal. This is why denoising in Fourier space is so powerful — zeroing out noisy high-frequency bins directly controls image quality.</p>
+</section>
+
+<!-- ══ SECTION 4 — FFT ══════════════════════════════════ -->
+<section class="section">
+  <div class="section-label">04 — The Fast Fourier Transform</div>
+  <h2>The <span class="hl3">FFT</span>: Making it Computable</h2>
+
+  <p>The Discrete Fourier Transform (DFT) is the practical, digital version of the FT. For N samples, computing it naively takes <strong>O(N²)</strong> operations — painfully slow for large signals or images. In 1965, Cooley and Tukey published the FFT algorithm, which computes the DFT in <strong>O(N log N)</strong> time by exploiting symmetry.</p>
+
+  <div class="formula-box fft">
+    <div class="formula-title">DISCRETE FOURIER TRANSFORM (DFT)</div>
+    <div class="formula fft">X[k] = Σ<sub>n=0</sub><sup>N-1</sup> x[n] · e<sup>-i2πkn/N</sup></div>
+    <div class="formula-note">
+      <strong style="color:#e2e8f0">Variables:</strong><br>
+      • <span style="color:var(--accent3)">x[n]</span> — the discrete input signal (N samples)<br>
+      • <span style="color:var(--accent3)">X[k]</span> — the k-th frequency bin of the spectrum<br>
+      • <span style="color:var(--accent3)">k</span> — frequency index (0 to N-1)<br>
+      • The FFT computes all N values of X[k] simultaneously using divide-and-conquer
+    </div>
+  </div>
+
+  <p>The FFT works by recursively splitting the DFT into smaller DFTs of even- and odd-indexed elements (the Cooley-Tukey butterfly), then combining results. A length-8 DFT → two length-4 DFTs → four length-2 DFTs. Each level halves the problem, giving the log N factor.</p>
+
+  <!-- DEMO 4: Complexity Comparison -->
+  <div class="demo-wrap">
+    <div class="demo-title">LIVE DEMO — DFT vs FFT Operations Count</div>
+    <canvas id="complexityCanvas" height="230"></canvas>
+    <div class="controls">
+      <div class="control-group">
+        <label>Max N (samples)</label>
+        <input type="range" id="maxN" min="64" max="2048" value="512" step="64">
+        <span class="val-display" id="maxNVal">512</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEMO 5: 2D FFT Concept -->
+  <div class="demo-wrap">
+    <div class="demo-title">LIVE DEMO — 2D FFT Magnitude Spectrum (Image Processing)</div>
+    <canvas id="fft2dCanvas" height="220"></canvas>
+    <div class="controls">
+      <button class="pill active" id="btn2dStripes">Stripes</button>
+      <button class="pill" id="btn2dCircle">Rings</button>
+      <button class="pill" id="btn2dDots">Dot Grid</button>
+      <button class="pill" id="btn2dNoise">Noise</button>
+    </div>
+  </div>
+
+  <p>In 2D (e.g., your brain MRI work), the FFT is applied row-wise then column-wise. The center of the magnitude spectrum corresponds to low frequencies (overall brightness/contrast), while edges represent high frequencies (sharp edges and fine detail). The 2D FFT lets you apply spatial filters by simply masking regions of the spectrum.</p>
+</section>
+
+<!-- ══ SECTION 5 — COMPARISON ═══════════════════════════ -->
+<section class="section">
+  <div class="section-label">05 — Summary</div>
+  <h2>FT vs IFT vs FFT at a Glance</h2>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Property</th>
+        <th><span class="tag ft">FT</span></th>
+        <th><span class="tag ift">IFT</span></th>
+        <th><span class="tag fft">FFT</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Direction</td>
+        <td>Time/Space → Frequency</td>
+        <td>Frequency → Time/Space</td>
+        <td>Either (algorithm)</td>
+      </tr>
+      <tr>
+        <td>Exponent sign</td>
+        <td>−i2πξt</td>
+        <td>+i2πξt</td>
+        <td>Both (−i forward, +i inverse)</td>
+      </tr>
+      <tr>
+        <td>Domain</td>
+        <td>Continuous</td>
+        <td>Continuous</td>
+        <td>Discrete (sampled)</td>
+      </tr>
+      <tr>
+        <td>Complexity</td>
+        <td>∞ (theoretical)</td>
+        <td>∞ (theoretical)</td>
+        <td>O(N log N)</td>
+      </tr>
+      <tr>
+        <td>Output type</td>
+        <td>Complex spectrum F(ξ)</td>
+        <td>Real/complex signal f(t)</td>
+        <td>Complex array X[k]</td>
+      </tr>
+      <tr>
+        <td>Key application</td>
+        <td>Theory, analysis</td>
+        <td>MRI reconstruction, synthesis</td>
+        <td>Audio, image processing, DSP</td>
+      </tr>
+      <tr>
+        <td>Python call</td>
+        <td>—</td>
+        <td>—</td>
+        <td><code>np.fft.fft(x)</code> / <code>np.fft.ifft(X)</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="formula-box" style="border-left-color: var(--gold);">
+    <div class="formula-title">THE CENTRAL RELATIONSHIP</div>
+    <div class="formula" style="color: var(--gold);">IFT( FT( f ) ) = f</div>
+    <div class="formula-note">
+      Applying the forward then inverse transform recovers the original signal perfectly. This is the Fourier Inversion Theorem — the mathematical guarantee that no information is lost in the transform. In practice, the FFT is used for both directions with only a sign change in the exponent and a 1/N normalization factor.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Fourier Transform Visual Walkthrough · FT · IFT · FFT ·
+  <span>Built for deep understanding</span>
+</footer>
+
+<script>
+// ══════════════════════════════════════════════
+// HERO CANVAS — animated wave
+// ══════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('heroCanvas');
+  const ctx = canvas.getContext('2d');
+  let t = 0;
+
+  function resize() {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function draw() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const numWaves = 6;
+    for (let w = 0; w < numWaves; w++) {
+      const freq = (w + 1) * 0.8;
+      const amp = (H * 0.08) / (w * 0.5 + 1);
+      const phase = (w * Math.PI * 0.4) + t * (0.3 + w * 0.1);
+      const yBase = H * (0.2 + w * 0.12);
+      const hue = 190 + w * 25;
+      ctx.beginPath();
+      ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${0.4 - w * 0.04})`;
+      ctx.lineWidth = 1.5;
+      for (let x = 0; x <= W; x++) {
+        const y = yBase + amp * Math.sin((x / W) * Math.PI * 2 * freq + phase);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    t += 0.008;
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ══════════════════════════════════════════════
+// DEMO 1 — Sum of Sines
+// ══════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('sineCanvas');
+  const ctx = canvas.getContext('2d');
+  const slider = document.getElementById('harmonics');
+  const val = document.getElementById('harmonicsVal');
+  let mode = 'square';
+  let animT = 0;
+
+  function resize() { canvas.width = canvas.offsetWidth; canvas.height = 200; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function getY(x, harmonics, t) {
+    let sum = 0;
+    const N = Math.floor(harmonics);
+    if (mode === 'square') {
+      for (let k = 0; k < N; k++) {
+        const n = 2 * k + 1;
+        sum += (4 / (Math.PI * n)) * Math.sin(n * x + t * 0.3);
+      }
+    } else if (mode === 'saw') {
+      for (let k = 1; k <= N; k++) {
+        sum += (2 / (Math.PI * k)) * Math.pow(-1, k+1) * Math.sin(k * x + t * 0.3);
+      }
+    } else {
+      for (let k = 0; k < N; k++) {
+        const n = 2 * k + 1;
+        sum += (8 / (Math.PI * Math.PI * n * n)) * Math.pow(-1, k) * Math.sin(n * x + t * 0.3);
+      }
+    }
+    return sum;
+  }
+
+  function draw() {
+    const W = canvas.width, H = 200;
+    ctx.clearRect(0, 0, W, H);
+    const cx = H / 2;
+
+    // Grid line
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, cx); ctx.lineTo(W, cx); ctx.stroke();
+
+    const harm = parseInt(slider.value);
+    const scale = H * 0.38;
+
+    // Component waves (faint)
+    if (harm <= 8) {
+      for (let k = 0; k < harm; k++) {
+        const n = mode === 'square' || mode === 'tri' ? 2*k+1 : k+1;
+        let amp;
+        if (mode === 'square') amp = (4 / (Math.PI * n));
+        else if (mode === 'saw') amp = (2 / (Math.PI * (k+1))) * Math.pow(-1, k);
+        else amp = (8 / (Math.PI*Math.PI*n*n)) * Math.pow(-1, k);
+        ctx.beginPath();
+        ctx.strokeStyle = `hsla(${190 + k*30}, 80%, 60%, 0.25)`;
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= W; x++) {
+          const phase = (x / W) * 2 * Math.PI * 2;
+          const y = cx - amp * scale * Math.sin(n * phase + animT * 0.3);
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // Sum wave
+    ctx.beginPath();
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#00e5ff';
+    ctx.shadowBlur = 8;
+    for (let x = 0; x <= W; x++) {
+      const xNorm = (x / W) * 2 * Math.PI * 2;
+      const y = cx - getY(xNorm, harm, animT) * scale;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    animT += 0.02;
+    requestAnimationFrame(draw);
+  }
+
+  slider.addEventListener('input', () => { val.textContent = slider.value; });
+
+  document.getElementById('btnSquare').addEventListener('click', function() {
+    mode = 'square'; setActive(this, [document.getElementById('btnSaw'), document.getElementById('btnTri')]);
+  });
+  document.getElementById('btnSaw').addEventListener('click', function() {
+    mode = 'saw'; setActive(this, [document.getElementById('btnSquare'), document.getElementById('btnTri')]);
+  });
+  document.getElementById('btnTri').addEventListener('click', function() {
+    mode = 'tri'; setActive(this, [document.getElementById('btnSquare'), document.getElementById('btnSaw')]);
+  });
+
+  function setActive(el, others) {
+    others.forEach(o => o.classList.remove('active'));
+    el.classList.add('active');
+  }
+  draw();
+})();
+
+// ══════════════════════════════════════════════
+// DEMO 2 — Spectrum Analyzer
+// ══════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('spectrumCanvas');
+  const ctx = canvas.getContext('2d');
+  let mode = 'sin1';
+  let animT = 0;
+
+  function resize() { canvas.width = canvas.offsetWidth; canvas.height = 220; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function getSignalAndSpectrum() {
+    const N = 256;
+    const signal = new Float32Array(N);
+    const spectrum = [];
+    if (mode === 'sin1') {
+      for (let n = 0; n < N; n++) signal[n] = Math.sin(2 * Math.PI * 2 * n / N);
+      spectrum.push({ freq: 2, amp: 1.0, color: '#00e5ff' });
+    } else if (mode === 'sin2') {
+      for (let n = 0; n < N; n++) signal[n] = Math.sin(2*Math.PI*2*n/N) + 0.6*Math.sin(2*Math.PI*5*n/N);
+      spectrum.push({ freq: 2, amp: 1.0, color: '#00e5ff' }, { freq: 5, amp: 0.6, color: '#ff3d7f' });
+    } else if (mode === 'sin3') {
+      for (let n = 0; n < N; n++) signal[n] = Math.sin(2*Math.PI*2*n/N) + 0.5*Math.sin(2*Math.PI*5*n/N) + 0.3*Math.sin(2*Math.PI*11*n/N);
+      spectrum.push({ freq: 2, amp: 1.0, color: '#00e5ff' }, { freq: 5, amp: 0.5, color: '#ff3d7f' }, { freq: 11, amp: 0.3, color: '#a78bfa' });
+    } else {
+      for (let n = 0; n < N; n++) signal[n] = Math.sin(2*Math.PI*(2 + n/N*8)*n/N);
+      for (let f = 2; f <= 10; f++) spectrum.push({ freq: f, amp: 0.35, color: `hsl(${180+f*15},80%,65%)` });
+    }
+    return { signal, spectrum };
+  }
+
+  function draw() {
+    const W = canvas.width, H = 220;
+    ctx.clearRect(0, 0, W, H);
+    const { signal, spectrum } = getSignalAndSpectrum();
+    const topH = H * 0.45, botH = H * 0.45, gap = H * 0.1;
+    const topMid = topH / 2;
+
+    // — Time domain —
+    ctx.strokeStyle = '#1a1a28'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, topMid); ctx.lineTo(W, topMid); ctx.stroke();
+
+    ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2;
+    ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    for (let x = 0; x < W; x++) {
+      const idx = Math.floor(x / W * signal.length);
+      const y = topMid - signal[idx] * topMid * 0.8;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // label
+    ctx.font = '10px Space Mono';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('time domain', 8, 14);
+
+    // — Frequency domain —
+    const freqTop = topH + gap;
+    const maxFreq = mode === 'chirp' ? 12 : 14;
+
+    ctx.strokeStyle = '#1a1a28'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, freqTop + botH); ctx.lineTo(W, freqTop + botH); ctx.stroke();
+
+    spectrum.forEach(({ freq, amp }) => {
+      const x = (freq / maxFreq) * W;
+      const barH = amp * botH * 0.85;
+      const pulseMult = 1 + 0.06 * Math.sin(animT * 3);
+      const grd = ctx.createLinearGradient(0, freqTop + botH - barH * pulseMult, 0, freqTop + botH);
+      grd.addColorStop(0, '#00e5ff');
+      grd.addColorStop(1, 'rgba(0,229,255,0.1)');
+      ctx.fillStyle = grd;
+      ctx.shadowColor = '#00e5ff';
+      ctx.shadowBlur = 12;
+      ctx.fillRect(x - 4, freqTop + botH - barH * pulseMult, 8, barH * pulseMult);
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '9px Space Mono';
+      ctx.fillText(freq + 'Hz', x - 8, freqTop + botH + 14);
+    });
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px Space Mono';
+    ctx.fillText('frequency domain |F(ξ)|', 8, freqTop + 14);
+
+    animT += 0.015;
+    requestAnimationFrame(draw);
+  }
+
+  ['btnSin1','btnSin2','btnSin3','btnChirp'].forEach((id, i) => {
+    const modes = ['sin1','sin2','sin3','chirp'];
+    document.getElementById(id).addEventListener('click', function() {
+      mode = modes[i];
+      ['btnSin1','btnSin2','btnSin3','btnChirp'].forEach(b => document.getElementById(b).classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+  draw();
+})();
+
+// ══════════════════════════════════════════════
+// DEMO 3 — IFT Reconstruction
+// ══════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('iftCanvas');
+  const ctx = canvas.getContext('2d');
+  const freqSlider = document.getElementById('iftFreqs');
+  const noiseSlider = document.getElementById('iftNoise');
+  const freqVal = document.getElementById('iftFreqsVal');
+  const noiseVal = document.getElementById('iftNoiseVal');
+
+  function resize() { canvas.width = canvas.offsetWidth; canvas.height = 220; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Target: square wave components
+  const TARGET_FREQS = [];
+  for (let k = 0; k < 30; k++) {
+    const n = 2*k+1;
+    TARGET_FREQS.push({ freq: n, amp: 4/(Math.PI*n), phase: 0 });
+  }
+
+  function draw() {
+    const W = canvas.width, H = 220;
+    ctx.clearRect(0, 0, W, H);
+    const nFreqs = parseInt(freqSlider.value);
+    const noise = parseInt(noiseSlider.value) / 100;
+
+    const topH = H*0.45, botH = H*0.45, gap = H*0.1;
+
+    // — Spectrum (top) —
+    const barZone = topH * 0.8;
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px Space Mono';
+    ctx.fillText('frequency domain (with noise)', 8, 14);
+
+    ctx.strokeStyle = '#1a1a28'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, topH); ctx.lineTo(W, topH); ctx.stroke();
+
+    TARGET_FREQS.slice(0, nFreqs).forEach(({ freq, amp }, i) => {
+      const noiseAmount = noise * Math.random() * 0.5;
+      const displayAmp = amp + noiseAmount;
+      const x = (i / 30) * W;
+      const bH = displayAmp * barZone * 2.5;
+      const color = noise > 0.2 ? '#ff3d7f' : '#ff3d7f';
+      const baseColor = '#ff3d7f';
+      ctx.fillStyle = noise > 0 && Math.random() < noise * 0.5
+        ? `rgba(255,61,127,${0.3 + Math.random()*0.4})`
+        : `rgba(255,61,127,0.7)`;
+      ctx.fillRect(x, topH - bH, W/32, bH);
+    });
+
+    // — Reconstructed signal (bottom) —
+    const freqBase = topH + gap;
+    const midY = freqBase + botH/2;
+    ctx.strokeStyle = '#1a1a28'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px Space Mono';
+    ctx.fillText('reconstructed signal f(t) via IFT', 8, freqBase + 14);
+
+    ctx.beginPath();
+    const amplitude = botH * 0.42;
+    for (let x = 0; x <= W; x++) {
+      const t = (x / W) * 2 * Math.PI;
+      let y = 0;
+      TARGET_FREQS.slice(0, nFreqs).forEach(({ freq, amp }) => {
+        const noiseAmp = noise * (Math.random() - 0.5) * 0.3;
+        y += (amp + noiseAmp) * Math.sin(freq * t);
+      });
+      const plotY = midY - y * amplitude;
+      x === 0 ? ctx.moveTo(x, plotY) : ctx.lineTo(x, plotY);
+    }
+    ctx.strokeStyle = noise > 0.1 ? `rgba(255,61,127,0.9)` : '#ff3d7f';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#ff3d7f';
+    ctx.shadowBlur = noise > 0.1 ? 2 : 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    requestAnimationFrame(draw);
+  }
+
+  freqSlider.addEventListener('input', () => { freqVal.textContent = freqSlider.value; });
+  noiseSlider.addEventListener('input', () => { noiseVal.textContent = noiseSlider.value + '%'; });
+  draw();
+})();
+
+// ══════════════════════════════════════════════
+// DEMO 4 — Complexity Comparison
+// ══════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('complexityCanvas');
+  const ctx = canvas.getContext('2d');
+  const slider = document.getElementById('maxN');
+  const valEl = document.getElementById('maxNVal');
+
+  function resize() { canvas.width = canvas.offsetWidth; canvas.height = 230; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function draw() {
+    const W = canvas.width, H = 230;
+    ctx.clearRect(0, 0, W, H);
+    const maxN = parseInt(slider.value);
+    const pad = { l: 60, r: 20, t: 20, b: 40 };
+    const gW = W - pad.l - pad.r, gH = H - pad.t - pad.b;
+
+    // Max ops for scale
+    const maxOps = maxN * maxN;
+    const pts = 100;
+
+    // Grid
+    ctx.strokeStyle = '#1a1a28'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = pad.t + (i / 4) * gH;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + gW, y); ctx.stroke();
+      const opVal = maxOps * (1 - i/4);
+      ctx.fillStyle = '#2a2a3f'; ctx.font = '9px Space Mono';
+      ctx.fillText(opVal >= 1e6 ? (opVal/1e6).toFixed(1)+'M' : opVal >= 1e3 ? (opVal/1e3).toFixed(0)+'K' : opVal.toFixed(0), 0, y + 4);
+    }
+
+    // Axes
+    ctx.strokeStyle = '#2a2a3f'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t+gH); ctx.lineTo(pad.l+gW, pad.t+gH); ctx.stroke();
+
+    // N² — DFT
+    ctx.beginPath();
+    ctx.strokeStyle = '#ff3d7f'; ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#ff3d7f'; ctx.shadowBlur = 8;
+    for (let i = 0; i <= pts; i++) {
+      const n = (i / pts) * maxN;
+      const ops = n * n;
+      const x = pad.l + (n / maxN) * gW;
+      const y = pad.t + gH - (ops / maxOps) * gH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // N log N — FFT
+    ctx.beginPath();
+    ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 8;
+    for (let i = 0; i <= pts; i++) {
+      const n = Math.max(1, (i / pts) * maxN);
+      const ops = n * Math.log2(n);
+      const x = pad.l + (n / maxN) * gW;
+      const y = pad.t + gH - (ops / maxOps) * gH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Crosshair at maxN
+    const dftOps = maxN * maxN;
+    const fftOps = maxN * Math.log2(maxN);
+    ctx.strokeStyle = '#2a2a3f'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l+gW, pad.t); ctx.lineTo(pad.l+gW, pad.t+gH); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Labels
+    ctx.font = '11px Space Mono'; ctx.fillStyle = '#ff3d7f';
+    ctx.fillText(`DFT: O(N²) = ${dftOps >= 1e6 ? (dftOps/1e6).toFixed(2)+'M' : (dftOps/1e3).toFixed(0)+'K'} ops`, pad.l + 8, pad.t + 18);
+    ctx.fillStyle = '#a78bfa';
+    ctx.fillText(`FFT: O(N log N) = ${fftOps >= 1e3 ? (fftOps/1e3).toFixed(1)+'K' : fftOps.toFixed(0)} ops`, pad.l + 8, pad.t + 34);
+
+    const speedup = (dftOps / fftOps).toFixed(0);
+    ctx.fillStyle = '#34d399'; ctx.font = 'bold 12px Syne, sans-serif';
+    ctx.fillText(`${speedup}× faster`, pad.l + gW - 90, pad.t + 18);
+
+    // Axis labels
+    ctx.fillStyle = '#64748b'; ctx.font = '9px Space Mono';
+    ctx.fillText('N (samples)', pad.l + gW/2 - 30, H - 5);
+  }
+
+  slider.addEventListener('input', () => { valEl.textContent = slider.value; draw(); });
+  draw();
+})();
+
+// ══════════════════════════════════════════════
+// DEMO 5 — 2D FFT Concept
+// ══════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('fft2dCanvas');
+  const ctx = canvas.getContext('2d');
+  let mode = 'stripes';
+
+  function resize() { canvas.width = canvas.offsetWidth; canvas.height = 220; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function makeImage(N, mode) {
+    const img = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        if (mode === 'stripes') {
+          img[y*N+x] = Math.sin(2*Math.PI*4*x/N) > 0 ? 1 : 0;
+        } else if (mode === 'rings') {
+          const cx = x-N/2, cy = y-N/2, r = Math.sqrt(cx*cx+cy*cy);
+          img[y*N+x] = Math.sin(2*Math.PI*3*r/N) > 0 ? 1 : 0;
+        } else if (mode === 'dots') {
+          img[y*N+x] = (Math.sin(2*Math.PI*4*x/N) > 0 && Math.sin(2*Math.PI*4*y/N) > 0) ? 1 : 0;
+        } else {
+          img[y*N+x] = Math.random();
+        }
+      }
+    }
+    return img;
+  }
+
+  // Simplified 1D DFT
+  function dft1d(signal) {
+    const N = signal.length;
+    const real = new Float32Array(N), imag = new Float32Array(N);
+    for (let k = 0; k < N; k++) {
+      for (let n = 0; n < N; n++) {
+        const angle = -2*Math.PI*k*n/N;
+        real[k] += signal[n] * Math.cos(angle);
+        imag[k] += signal[n] * Math.sin(angle);
+      }
+    }
+    return { real, imag };
+  }
+
+  function dft2dMagnitude(img, N) {
+    // Row-wise DFT
+    const rowReal = new Float32Array(N*N), rowImag = new Float32Array(N*N);
+    for (let y = 0; y < N; y++) {
+      const row = img.slice(y*N, y*N+N);
+      const { real, imag } = dft1d(row);
+      for (let x = 0; x < N; x++) { rowReal[y*N+x]=real[x]; rowImag[y*N+x]=imag[x]; }
+    }
+    // Col-wise DFT
+    const mag = new Float32Array(N*N);
+    for (let x = 0; x < N; x++) {
+      const colR = new Float32Array(N), colI = new Float32Array(N);
+      for (let y = 0; y < N; y++) { colR[y]=rowReal[y*N+x]; colI[y]=rowImag[y*N+x]; }
+      const rr = new Float32Array(N), ri = new Float32Array(N);
+      for (let k = 0; k < N; k++) {
+        for (let n = 0; n < N; n++) {
+          const a = -2*Math.PI*k*n/N;
+          rr[k] += colR[n]*Math.cos(a)-colI[n]*Math.sin(a);
+          ri[k] += colR[n]*Math.sin(a)+colI[n]*Math.cos(a);
+        }
+      }
+      for (let y = 0; y < N; y++) {
+        // fftshift: swap quadrants
+        const sy = (y + N/2) % N;
+        mag[sy*N + ((x+N/2)%N)] = Math.log(1+Math.sqrt(rr[y]*rr[y]+ri[y]*ri[y]));
+      }
+    }
+    return mag;
+  }
+
+  let cachedMode = null;
+  let cachedData = null;
+  const N = 32; // Small N for performance
+
+  function draw() {
+    const W = canvas.width, H = 220;
+    ctx.clearRect(0, 0, W, H);
+
+    if (mode !== cachedMode) {
+      const img = makeImage(N, mode);
+      cachedData = { img, mag: dft2dMagnitude(img, N) };
+      cachedMode = mode;
+    }
+    const { img, mag } = cachedData;
+    const maxMag = Math.max(...mag);
+
+    const half = Math.min(W/2 - 20, H) | 0;
+    const cellSize = half / N;
+    const lx = 10, rx = W/2 + 10;
+
+    // Left: spatial image
+    ctx.fillStyle = '#64748b'; ctx.font = '10px Space Mono';
+    ctx.fillText('spatial domain f(x,y)', lx, 14);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const v = img[y*N+x];
+        ctx.fillStyle = `rgba(0,229,255,${v * 0.9 + 0.05})`;
+        ctx.fillRect(lx + x*cellSize, 22 + y*cellSize, cellSize-0.5, cellSize-0.5);
+      }
+    }
+
+    // Right: magnitude spectrum
+    ctx.fillStyle = '#64748b'; ctx.font = '10px Space Mono';
+    ctx.fillText('|F(u,v)| magnitude spectrum', rx, 14);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const v = mag[y*N+x] / (maxMag || 1);
+        const r = Math.floor(v * 255);
+        ctx.fillStyle = `rgb(${r},${Math.floor(r*0.4)},${Math.floor(r*0.8+50)})`;
+        ctx.fillRect(rx + x*cellSize, 22 + y*cellSize, cellSize-0.5, cellSize-0.5);
+      }
+    }
+
+    ctx.fillStyle = '#2a2a3f'; ctx.font = '9px Space Mono';
+    ctx.fillText('center = low freq', rx + half/2 - 40, 22 + half + 14);
+    ctx.fillText('edges = high freq', rx + half - 85, 22 + half/2);
+  }
+
+  ['btn2dStripes','btn2dCircle','btn2dDots','btn2dNoise'].forEach((id, i) => {
+    const modes = ['stripes','rings','dots','noise'];
+    document.getElementById(id).addEventListener('click', function() {
+      mode = modes[i];
+      ['btn2dStripes','btn2dCircle','btn2dDots','btn2dNoise'].forEach(b => document.getElementById(b).classList.remove('active'));
+      this.classList.add('active');
+      draw();
+    });
+  });
+  draw();
+})();
+</script>
+</body>
+</html>
