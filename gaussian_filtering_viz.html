@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gaussian Filtering in Image Processing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #7efff5;
+    --accent2: #ff6b9d;
+    --accent3: #ffd166;
+    --text: #e0e0f0;
+    --muted: #6666aa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(126,255,245,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126,255,245,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .container {
+    position: relative; z-index: 1;
+    max-width: 1100px; margin: 0 auto; padding: 40px 24px;
+  }
+
+  header {
+    text-align: center; margin-bottom: 60px;
+  }
+  header .label {
+    font-family: 'Space Mono', monospace;
+    color: var(--accent); font-size: 12px; letter-spacing: 4px;
+    text-transform: uppercase; margin-bottom: 16px;
+  }
+  header h1 {
+    font-size: clamp(28px, 5vw, 54px);
+    font-weight: 800; line-height: 1.1;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 60%, var(--accent3) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  header p {
+    margin-top: 16px; color: var(--muted); font-size: 16px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .section {
+    margin-bottom: 56px;
+  }
+  .section-title {
+    font-size: 13px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--accent2); font-family: 'Space Mono', monospace;
+    margin-bottom: 20px; display: flex; align-items: center; gap: 12px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--accent2), transparent);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+
+  /* ── PART 1: Why Gaussian Smoothing ── */
+  .demo-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px; align-items: start;
+  }
+  .demo-panel {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .demo-panel canvas {
+    border: 1px solid var(--border); border-radius: 6px;
+  }
+  .demo-panel .tag {
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: var(--muted); text-align: center;
+  }
+  .demo-panel .tag strong { color: var(--text); display: block; font-size: 13px; }
+
+  .arrow-col {
+    display: flex; align-items: center; justify-content: center;
+    height: 160px; font-size: 28px; color: var(--accent);
+  }
+
+  /* noise slider */
+  .controls {
+    display: flex; align-items: center; gap: 16px;
+    margin-top: 16px; justify-content: center;
+    font-family: 'Space Mono', monospace; font-size: 12px; color: var(--muted);
+  }
+  input[type=range] {
+    -webkit-appearance: none; width: 160px; height: 4px;
+    background: var(--border); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+
+  /* ── PART 2: Gaussian kernel visual ── */
+  #kernelCanvas { display: block; margin: 0 auto; }
+
+  /* ── PART 3: DoG ── */
+  .dog-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 12px; align-items: center; text-align: center;
+  }
+  .dog-grid canvas { border-radius: 6px; border: 1px solid var(--border); }
+  .dog-op {
+    font-size: 26px; color: var(--accent3);
+    font-weight: 700;
+  }
+  .dog-label {
+    font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ── PART 4: Derivative of Gaussian ── */
+  .dog2-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .dog2-panel { text-align: center; }
+  .dog2-panel h3 {
+    font-size: 13px; color: var(--accent); margin-bottom: 12px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── 1D signal demo ── */
+  .signal-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px; align-items: start;
+  }
+
+  /* Formula boxes */
+  .formula {
+    background: #0d0d1a; border-left: 3px solid var(--accent3);
+    border-radius: 4px; padding: 14px 18px;
+    font-family: 'Space Mono', monospace; font-size: 13px; color: var(--accent3);
+    margin: 12px 0; line-height: 1.8;
+  }
+  .formula em { color: var(--muted); font-style: normal; font-size: 11px; }
+
+  .insight {
+    background: rgba(126,255,245,0.04); border: 1px solid rgba(126,255,245,0.15);
+    border-radius: 8px; padding: 14px 18px; margin-top: 14px;
+    font-size: 14px; line-height: 1.7; color: var(--text);
+  }
+  .insight strong { color: var(--accent); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  footer {
+    text-align: center; padding: 40px 0 20px;
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="container">
+
+  <header>
+    <div class="label">BIOE 484 · Image Processing</div>
+    <h1>Gaussian Filtering &amp;<br>Derivative of Gaussian</h1>
+    <p>// why smoothing is needed — and how to take image derivatives</p>
+  </header>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- SECTION 1: The noise problem           -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">01 — The Problem: Noise Corrupts Derivatives</div>
+    <div class="card">
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px;font-family:'Space Mono',monospace;">
+        Edge detection requires computing image gradients (derivatives). But <strong style="color:var(--accent2)">raw derivatives amplify noise</strong>. Drag the slider to see this in action on a 1D signal cross-section.
+      </p>
+      <div class="signal-row">
+        <div class="demo-panel">
+          <canvas id="sigClean" width="230" height="160"></canvas>
+          <div class="tag"><strong>Clean Signal</strong>a step edge (ideal)</div>
+        </div>
+        <div class="demo-panel">
+          <canvas id="sigNoisy" width="230" height="160"></canvas>
+          <div class="tag"><strong>Noisy Signal</strong>Gaussian noise added</div>
+        </div>
+        <div class="demo-panel">
+          <canvas id="sigDeriv" width="230" height="160"></canvas>
+          <div class="tag"><strong>Raw Derivative</strong>finite differences — useless!</div>
+        </div>
+      </div>
+      <div class="controls">
+        <span>Noise level:</span>
+        <input type="range" id="noiseSlider" min="0" max="60" value="30">
+        <span id="noiseVal">30</span>
+      </div>
+      <div class="insight">
+        <strong>Key insight:</strong> The derivative operator (∂/∂x) is a high-pass filter — it <em>emphasizes</em> high-frequency noise. Without pre-smoothing, every edge detector drowns in noise spikes.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- SECTION 2: 2D Gaussian kernel          -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">02 — The Fix: Gaussian Smoothing (Low-Pass Filter)</div>
+    <div class="card">
+      <div class="two-col">
+        <div>
+          <p style="font-size:14px;color:var(--muted);margin-bottom:16px;font-family:'Space Mono',monospace;">
+            A 2D Gaussian acts as a low-pass filter — it attenuates high-frequency noise while preserving low-frequency structure (edges, blobs).
+          </p>
+          <div class="formula">
+            G(x,y) = <span style="color:var(--text)">1/(2πσ²)</span> · exp(−(x²+y²)/(2σ²))
+            <br><em>// isotropic, separable, rotationally symmetric</em>
+          </div>
+          <div class="formula" style="border-color:var(--accent)">
+            Smoothed = I ∗ G <span style="color:var(--muted)">  (convolution)</span>
+            <br>Derivative = ∂/∂x(I ∗ G) = I ∗ (∂G/∂x)
+            <br><em>// differentiation commutes with convolution!</em>
+          </div>
+          <div class="insight">
+            <strong>Separability:</strong> The 2D Gaussian factors into two 1D Gaussians: G(x,y) = G(x)·G(y). This lets you apply a 1D filter on rows, then columns — reducing an O(n²k²) operation to O(n²k).
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:16px">
+          <canvas id="kernelCanvas" width="280" height="280"></canvas>
+          <div class="controls" style="margin-top:0">
+            <span>σ:</span>
+            <input type="range" id="sigmaSlider" min="5" max="40" value="15">
+            <span id="sigmaVal">1.5</span>
+          </div>
+          <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);text-align:center">
+            Kernel magnitude (heatmap) · larger σ = more blur
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- SECTION 3: 2D image smoothing demo     -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">03 — Smoothing vs. Gradient on a 2D Image</div>
+    <div class="card">
+      <div class="demo-row">
+        <div class="demo-panel">
+          <canvas id="img2D_noisy" width="220" height="220"></canvas>
+          <div class="tag"><strong>Noisy Image</strong>salt-and-pepper + Gaussian noise</div>
+        </div>
+        <div class="demo-panel">
+          <canvas id="img2D_smooth" width="220" height="220"></canvas>
+          <div class="tag"><strong>After Gaussian Blur</strong>noise suppressed</div>
+        </div>
+        <div class="demo-panel">
+          <canvas id="img2D_grad" width="220" height="220"></canvas>
+          <div class="tag"><strong>Gradient Magnitude</strong>clean edges via DoG</div>
+        </div>
+      </div>
+      <div class="controls">
+        <span>σ blur:</span>
+        <input type="range" id="blurSlider" min="5" max="30" value="12">
+        <span id="blurVal">σ=1.2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- SECTION 4: Derivative of Gaussian      -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">04 — Derivative of Gaussian (DoG) Filters</div>
+    <div class="card">
+      <p style="font-size:14px;color:var(--muted);margin-bottom:20px;font-family:'Space Mono',monospace;">
+        Because convolution commutes with differentiation, instead of <em>smooth then differentiate</em>, we can <strong style="color:var(--accent)">differentiate the Gaussian kernel itself</strong> and convolve once.
+      </p>
+      <div class="dog2-grid">
+        <div class="dog2-panel">
+          <h3>∂G/∂x — Horizontal Derivative</h3>
+          <canvas id="dogX" width="260" height="200"></canvas>
+          <div class="formula" style="font-size:11px;margin-top:10px">
+            ∂G/∂x = −(x/σ²) · G(x,y)
+            <br><em>// "Mexican hat" rotated 90° around y-axis</em>
+          </div>
+        </div>
+        <div class="dog2-panel">
+          <h3>∂G/∂y — Vertical Derivative</h3>
+          <canvas id="dogY" width="260" height="200"></canvas>
+          <div class="formula" style="font-size:11px;margin-top:10px">
+            ∂G/∂y = −(y/σ²) · G(x,y)
+            <br><em>// responds to horizontal edges</em>
+          </div>
+        </div>
+      </div>
+
+      <div class="insight" style="margin-top:20px">
+        <strong>Gradient magnitude:</strong> |∇(I ∗ G)| = √[(I ∗ ∂G/∂x)² + (I ∗ ∂G/∂y)²]
+        &nbsp;&nbsp;·&nbsp;&nbsp;
+        <strong>Gradient direction:</strong> θ = atan2(Gy, Gx)
+        <br><br>
+        The <strong>Laplacian of Gaussian (LoG)</strong> = ∂²G/∂x² + ∂²G/∂y² is used for blob detection and zero-crossing edge detection. It produces a "Mexican hat" kernel.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- SECTION 5: Laplacian of Gaussian       -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-title">05 — Laplacian of Gaussian (LoG) — "Mexican Hat"</div>
+    <div class="card">
+      <div class="two-col">
+        <div>
+          <canvas id="logKernel" width="260" height="220"></canvas>
+          <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);margin-top:8px;text-align:center">
+            LoG kernel — negative center, positive surround
+          </div>
+        </div>
+        <div>
+          <p style="font-size:14px;color:var(--muted);margin-bottom:14px;font-family:'Space Mono',monospace;">
+            The LoG combines smoothing + second derivative into a single convolution kernel:
+          </p>
+          <div class="formula">
+            LoG(x,y) = −1/(πσ⁴) · [1 − (x²+y²)/(2σ²)] · exp(−(x²+y²)/(2σ²))
+          </div>
+          <div class="insight">
+            <strong>Zero crossings</strong> of the LoG response mark edge locations — this is the Marr-Hildreth edge detector. The LoG is also well approximated by a <strong>Difference of Gaussians (DoG)</strong>: 
+            G(σ₁) − G(σ₂) where σ₁ &lt; σ₂.
+            <br><br>
+            This DoG approximation is used in <strong>SIFT</strong> and other scale-space feature detectors.
+          </div>
+          <div class="controls" style="margin-top:16px;justify-content:flex-start">
+            <span>σ:</span>
+            <input type="range" id="logSigma" min="5" max="35" value="20">
+            <span id="logSigmaVal">σ=2.0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>BIOE 484 — Gaussian Filtering Visualization · Built with Canvas API</footer>
+</div>
+
+<script>
+// ─── Utilities ──────────────────────────────────────────────
+function lerp(a,b,t){return a+(b-a)*t;}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+
+function gaussianKernel1D(size, sigma) {
+  const k = [];
+  const half = Math.floor(size/2);
+  let sum = 0;
+  for(let i=0;i<size;i++){
+    const x = i - half;
+    k.push(Math.exp(-x*x/(2*sigma*sigma)));
+    sum += k[i];
+  }
+  return k.map(v=>v/sum);
+}
+
+function gaussianKernel2D(size, sigma) {
+  const half = Math.floor(size/2);
+  const k = [];
+  let sum = 0;
+  for(let y=0;y<size;y++){
+    k.push([]);
+    for(let x=0;x<size;x++){
+      const dx=x-half, dy=y-half;
+      const v = Math.exp(-(dx*dx+dy*dy)/(2*sigma*sigma));
+      k[y].push(v);
+      sum+=v;
+    }
+  }
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++) k[y][x]/=sum;
+  return k;
+}
+
+// Apply 2D convolution on Float32 array (single channel, w×h)
+function convolve2D(data, w, h, kernel) {
+  const ksize = kernel.length;
+  const half = Math.floor(ksize/2);
+  const out = new Float32Array(w*h);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      let sum=0;
+      for(let ky=0;ky<ksize;ky++){
+        for(let kx=0;kx<ksize;kx++){
+          const sx=clamp(x+kx-half,0,w-1);
+          const sy=clamp(y+ky-half,0,h-1);
+          sum+=data[sy*w+sx]*kernel[ky][kx];
+        }
+      }
+      out[y*w+x]=sum;
+    }
+  }
+  return out;
+}
+
+function renderGrayscale(canvas, data, w, h, scale=1, offset=0) {
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  const id=ctx.createImageData(w,h);
+  for(let i=0;i<w*h;i++){
+    const v=clamp(data[i]*scale+offset,0,255)|0;
+    id.data[4*i]=v; id.data[4*i+1]=v; id.data[4*i+2]=v; id.data[4*i+3]=255;
+  }
+  ctx.putImageData(id,0,0);
+}
+
+function renderColormap(canvas, data, w, h) {
+  // diverging: blue-black-red
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  const id=ctx.createImageData(w,h);
+  let mn=Infinity, mx=-Infinity;
+  data.forEach(v=>{if(v<mn)mn=v;if(v>mx)mx=v;});
+  const range=Math.max(Math.abs(mn),Math.abs(mx))||1;
+  for(let i=0;i<w*h;i++){
+    const t=data[i]/range; // -1..1
+    let r=0,g=0,b=0;
+    if(t>0){r=t*255;g=t*80;}
+    else{b=(-t)*255;g=(-t)*30;}
+    id.data[4*i]=r|0; id.data[4*i+1]=g|0; id.data[4*i+2]=b|0; id.data[4*i+3]=255;
+  }
+  ctx.putImageData(id,0,0);
+}
+
+// ─── Generate synthetic test image (circles + rectangle) ───
+function makeSyntheticImage(w,h) {
+  const data = new Float32Array(w*h).fill(30);
+  // rectangle
+  for(let y=40;y<100;y++) for(let x=20;x<180;x++) data[y*w+x]=200;
+  // circle
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    if((x-155)*(x-155)+(y-155)*(y-155)<1600) data[y*w+x]=180;
+  }
+  // small circle
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    if((x-60)*(x-60)+(y-160)*(y-160)<900) data[y*w+x]=220;
+  }
+  return data;
+}
+
+function addNoise(data, w, h, level) {
+  const out = data.slice();
+  for(let i=0;i<w*h;i++){
+    out[i] = clamp(out[i] + (Math.random()*2-1)*level, 0, 255);
+    if(Math.random()<0.02) out[i]=Math.random()<0.5?0:255; // S&P
+  }
+  return out;
+}
+
+// ─── SECTION 1: 1D signal demo ─────────────────────────────
+function draw1DSignal(canvas, signal, color='#7efff5', label='') {
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // bg
+  ctx.fillStyle='#0d0d1a'; ctx.fillRect(0,0,W,H);
+  // axes
+  ctx.strokeStyle='#1e1e2e'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+  // signal
+  ctx.strokeStyle=color; ctx.lineWidth=2;
+  ctx.beginPath();
+  for(let x=0;x<signal.length;x++){
+    const px=x*(W/signal.length);
+    const py=H/2 - signal[x]*(H*0.38)/128;
+    x===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+}
+
+function makeStepSignal(n, noiseLevel) {
+  const s=[];
+  for(let i=0;i<n;i++){
+    const clean = i<n/2 ? 30 : 180;
+    s.push(clean + (Math.random()*2-1)*noiseLevel);
+  }
+  return s;
+}
+
+function finiteDiff(sig) {
+  return sig.map((v,i)=>i>0?sig[i]-sig[i-1]:0);
+}
+
+function smoothSignal1D(sig, sigma) {
+  const size=Math.ceil(sigma*6)|1;
+  const k=gaussianKernel1D(size, sigma);
+  const half=Math.floor(size/2);
+  return sig.map((_,i)=>{
+    let s=0;
+    for(let j=0;j<size;j++){
+      const idx=clamp(i+j-half,0,sig.length-1);
+      s+=sig[idx]*k[j];
+    }
+    return s;
+  });
+}
+
+let noiseLevel = 30;
+function update1D() {
+  const n=230;
+  const raw = makeStepSignal(n, noiseLevel);
+  const clean = makeStepSignal(n, 0);
+  const deriv = finiteDiff(raw);
+  draw1DSignal(document.getElementById('sigClean'), clean, '#7efff5');
+  draw1DSignal(document.getElementById('sigNoisy'), raw, '#ffd166');
+  draw1DSignal(document.getElementById('sigDeriv'), deriv, '#ff6b9d');
+}
+
+document.getElementById('noiseSlider').addEventListener('input', e=>{
+  noiseLevel = +e.target.value;
+  document.getElementById('noiseVal').textContent = noiseLevel;
+  update1D();
+});
+update1D(); setInterval(update1D, 800); // re-randomize noise
+
+// ─── SECTION 2: 2D kernel heatmap ──────────────────────────
+function drawKernelHeatmap(canvas, sigma) {
+  const S=60; // kernel size
+  const W=canvas.width, H=canvas.height;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const k2d=gaussianKernel2D(S,sigma);
+  let mx=0;
+  k2d.forEach(row=>row.forEach(v=>{if(v>mx)mx=v;}));
+  const cw=W/S, ch=H/S;
+  for(let y=0;y<S;y++){
+    for(let x=0;x<S;x++){
+      const t=k2d[y][x]/mx;
+      // teal colormap
+      const r=(t*50)|0;
+      const g=(t*255)|0;
+      const b=(t*200+55*t)|0;
+      ctx.fillStyle=`rgb(${r},${g},${b})`;
+      ctx.fillRect(x*cw,y*ch,cw+1,ch+1);
+    }
+  }
+  // 3D-ish contours
+  ctx.strokeStyle='rgba(255,255,255,0.08)';
+  [0.9,0.7,0.5,0.3,0.1].forEach(level=>{
+    // approximate circle at each level: x²+y²=-2σ²ln(level·norm)
+    const half=S/2;
+    const r2=-2*sigma*sigma*Math.log(level);
+    if(r2<0||!isFinite(r2))return;
+    const r=Math.sqrt(r2)*(W/S);
+    ctx.beginPath();
+    ctx.arc(W/2, H/2, r, 0, Math.PI*2);
+    ctx.stroke();
+  });
+}
+
+let kSigma=15;
+function updateKernel(){
+  document.getElementById('sigmaVal').textContent=(kSigma/10).toFixed(1);
+  drawKernelHeatmap(document.getElementById('kernelCanvas'), kSigma);
+}
+document.getElementById('sigmaSlider').addEventListener('input', e=>{
+  kSigma=+e.target.value; updateKernel();
+});
+updateKernel();
+
+// ─── SECTION 3: 2D image demo ──────────────────────────────
+const IMG_W=220, IMG_H=220;
+const baseImg = makeSyntheticImage(IMG_W, IMG_H);
+
+function updateImgDemo(){
+  const blurS = +document.getElementById('blurSlider').value;
+  document.getElementById('blurVal').textContent='σ='+(blurS/10).toFixed(1);
+  const noisy = addNoise(baseImg, IMG_W, IMG_H, 35);
+  renderGrayscale(document.getElementById('img2D_noisy'), noisy, IMG_W, IMG_H);
+
+  const kSize = Math.ceil(blurS/10*3*2)|1;
+  const k2d = gaussianKernel2D(kSize, blurS/10*3);
+  const smoothed = convolve2D(noisy, IMG_W, IMG_H, k2d);
+  renderGrayscale(document.getElementById('img2D_smooth'), smoothed, IMG_W, IMG_H);
+
+  // Gradient via Sobel-like approach on smoothed
+  const Gx=[], Gy=[];
+  for(let y=0;y<IMG_H;y++){
+    for(let x=0;x<IMG_W;x++){
+      const xm=clamp(x-1,0,IMG_W-1), xp=clamp(x+1,0,IMG_W-1);
+      const ym=clamp(y-1,0,IMG_H-1), yp=clamp(y+1,0,IMG_H-1);
+      Gx.push(smoothed[y*IMG_W+xp]-smoothed[y*IMG_W+xm]);
+      Gy.push(smoothed[yp*IMG_W+x]-smoothed[ym*IMG_W+x]);
+    }
+  }
+  const mag=new Float32Array(IMG_W*IMG_H);
+  for(let i=0;i<IMG_W*IMG_H;i++) mag[i]=Math.sqrt(Gx[i]*Gx[i]+Gy[i]*Gy[i]);
+  renderGrayscale(document.getElementById('img2D_grad'), mag, IMG_W, IMG_H, 2.5);
+}
+document.getElementById('blurSlider').addEventListener('input', updateImgDemo);
+updateImgDemo(); setInterval(updateImgDemo, 1500);
+
+// ─── SECTION 4: DoG kernels ─────────────────────────────────
+function drawDogKernel(canvas, axis) {
+  // axis: 'x' or 'y'
+  const W=canvas.width, H=canvas.height;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const S=41, half=20, sigma=8;
+  const data=new Float32Array(S*S);
+  for(let y=0;y<S;y++) for(let x=0;x<S;x++){
+    const dx=x-half, dy=y-half;
+    const g=Math.exp(-(dx*dx+dy*dy)/(2*sigma*sigma));
+    data[y*S+x]= axis==='x' ? -dx/(sigma*sigma)*g : -dy/(sigma*sigma)*g;
+  }
+  // scale to W×H via bilinear
+  const id=ctx.createImageData(W,H);
+  let mx=0;
+  data.forEach(v=>{if(Math.abs(v)>mx)mx=Math.abs(v);});
+  for(let py=0;py<H;py++){
+    for(let px=0;px<W;px++){
+      const sx=px*(S/W), sy=py*(S/H);
+      const ix=Math.min(S-1,sx|0), iy=Math.min(S-1,sy|0);
+      const v=data[iy*S+ix]/mx;
+      let r,g,b;
+      if(v>0){r=(v*255)|0;g=(v*80)|0;b=0;}
+      else{r=0;g=((-v)*40)|0;b=((-v)*255)|0;}
+      const i=4*(py*W+px);
+      id.data[i]=r;id.data[i+1]=g;id.data[i+2]=b;id.data[i+3]=255;
+    }
+  }
+  ctx.putImageData(id,0,0);
+  // label center
+  ctx.strokeStyle='rgba(255,255,255,0.2)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+}
+drawDogKernel(document.getElementById('dogX'),'x');
+drawDogKernel(document.getElementById('dogY'),'y');
+
+// ─── SECTION 5: LoG kernel ──────────────────────────────────
+function drawLoG(canvas, sigma) {
+  const W=canvas.width, H=canvas.height;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const S=61, half=30;
+  const data=new Float32Array(S*S);
+  for(let y=0;y<S;y++) for(let x=0;x<S;x++){
+    const dx=x-half, dy=y-half;
+    const r2=dx*dx+dy*dy;
+    const g=Math.exp(-r2/(2*sigma*sigma));
+    data[y*S+x]= (-1/(Math.PI*Math.pow(sigma,4)))*(1-r2/(2*sigma*sigma))*g;
+  }
+  const id=ctx.createImageData(W,H);
+  let mx=0; data.forEach(v=>{if(Math.abs(v)>mx)mx=Math.abs(v);});
+  for(let py=0;py<H;py++){
+    for(let px=0;px<W;px++){
+      const sx=px*(S/W), sy=py*(S/H);
+      const ix=Math.min(S-1,sx|0), iy=Math.min(S-1,sy|0);
+      const v=data[iy*S+ix]/(mx||1);
+      let r,g,b;
+      if(v>0){r=(v*255)|0;g=(v*120)|0;b=0;}
+      else{r=0;g=((-v)*60)|0;b=((-v)*200)|0;}
+      // add teal tint for zero-crossing
+      const absV=Math.abs(v);
+      if(absV<0.05){r=20;g=80;b=60;}
+      const i=4*(py*W+px);
+      id.data[i]=r;id.data[i+1]=g;id.data[i+2]=b;id.data[i+3]=255;
+    }
+  }
+  ctx.putImageData(id,0,0);
+  // zero-crossing ring
+  ctx.strokeStyle='rgba(126,255,245,0.5)'; ctx.lineWidth=1.5;
+  ctx.setLineDash([4,4]);
+  const rZero=sigma*Math.sqrt(2)*(W/S);
+  ctx.beginPath(); ctx.arc(W/2,H/2,rZero,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+  // label
+  ctx.fillStyle='rgba(126,255,245,0.8)'; ctx.font='11px Space Mono,monospace';
+  ctx.fillText('zero crossing', W/2-40, H/2-rZero-6);
+}
+
+let logS=20;
+function updateLog(){
+  document.getElementById('logSigmaVal').textContent='σ='+(logS/10).toFixed(1);
+  drawLoG(document.getElementById('logKernel'), logS/10*3);
+}
+document.getElementById('logSigma').addEventListener('input',e=>{logS=+e.target.value;updateLog();});
+updateLog();
+</script>
+</body>
+</html>
