@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Transforms, Relaxation & Denoising</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #07080f;
+    --surface: #0c0e18;
+    --surface2: #111422;
+    --surface3: #0d1020;
+    --border: #1a1e35;
+    --border-bright: #2a3060;
+    --blue: #4a9eff;
+    --blue-dim: #1a3a6e;
+    --cyan: #7de8f5;
+    --teal: #5ee8c0;
+    --text: #cdd6f4;
+    --text-dim: #4a5280;
+    --text-mid: #7a84b0;
+    --green: #a6e3a1;
+    --yellow: #f9e2af;
+    --mauve: #cba6f7;
+    --red: #f38ba8;
+    --peach: #fab387;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    padding: 48px 32px 100px;
+    max-width: 1080px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, rgba(74,158,255,0.06) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none; z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -10%; left: 50%; transform: translateX(-50%);
+    width: 900px; height: 500px;
+    background: radial-gradient(ellipse, rgba(74,158,255,0.05) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    position: relative; z-index: 1;
+    margin-bottom: 52px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .page-header-left .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 8px;
+  }
+  .page-header-left h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(28px, 4.5vw, 52px);
+    font-weight: 400; letter-spacing: 0.05em; line-height: 1.0;
+    color: var(--text);
+  }
+  .page-header-left h1 span { color: var(--blue); }
+  .page-header-right {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--text-dim);
+    text-align: right; line-height: 2;
+  }
+  .page-header-right span { color: var(--cyan); }
+
+  /* ── Section ── */
+  .section { position: relative; z-index: 1; margin-bottom: 60px; }
+
+  .section-title {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 24px;
+  }
+  .section-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 38px; line-height: 1; color: var(--border-bright);
+    flex-shrink: 0;
+  }
+  .section-title-text { display: flex; flex-direction: column; gap: 2px; }
+  .section-title-text h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px; font-weight: 400; letter-spacing: 0.08em;
+    color: var(--text);
+  }
+  .section-title-text .sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.15em; color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600; color: var(--text);
+    margin-bottom: 6px;
+  }
+  .card-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em;
+    text-transform: uppercase; margin-bottom: 16px;
+  }
+
+  /* ── Math formula block ── */
+  .math {
+    background: var(--surface3);
+    border-left: 2px solid var(--blue-dim);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12.5px; line-height: 2;
+    color: var(--yellow);
+    margin: 12px 0;
+  }
+  .math .comment { color: var(--text-dim); font-size: 11px; font-style: italic; }
+  .math .hi { color: var(--cyan); }
+  .math .hi2 { color: var(--teal); }
+  .math .hi3 { color: var(--mauve); }
+
+  /* ── Insight box ── */
+  .insight {
+    background: rgba(74,158,255,0.05);
+    border: 1px solid rgba(74,158,255,0.15);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 13px; line-height: 1.7; color: var(--text-mid);
+    margin-top: 12px;
+  }
+  .insight strong { color: var(--cyan); }
+
+  /* ── Canvas grids ── */
+  .canvas-row {
+    display: grid; gap: 16px; margin: 16px 0;
+    align-items: start;
+  }
+  .canvas-row.cols-2 { grid-template-columns: 1fr 1fr; }
+  .canvas-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .canvas-row.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .canvas-row.cols-5 { grid-template-columns: repeat(5, 1fr); }
+
+  .cvpanel {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .cvpanel canvas {
+    border: 1px solid var(--border); border-radius: 5px;
+    display: block; width: 100%; max-width: 200px; image-rendering: pixelated;
+  }
+  .cvpanel .clabel {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--text-dim); text-align: center;
+    line-height: 1.4;
+  }
+  .cvpanel .clabel strong { color: var(--text); display: block; font-size: 11px; }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin: 14px 0;
+    font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-dim);
+  }
+  .controls label { color: var(--text-mid); }
+
+  input[type=range] {
+    -webkit-appearance: none; height: 3px;
+    background: var(--border); border-radius: 2px; outline: none; width: 120px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--blue); cursor: pointer;
+  }
+
+  .btn {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    padding: 6px 14px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--border-bright); background: var(--surface2);
+    color: var(--text-mid); transition: all 0.15s; letter-spacing: 0.05em;
+  }
+  .btn:hover { background: var(--border-bright); color: var(--text); }
+  .btn.active { border-color: var(--blue); color: var(--blue); background: rgba(74,158,255,0.08); }
+
+  select {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    padding: 5px 10px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--border-bright); background: var(--surface2);
+    color: var(--text-mid); outline: none;
+  }
+
+  /* ── Transform tabs ── */
+  .tab-row {
+    display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+
+  /* ── Two-col layout ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* ── Iteration counter badge ── */
+  .badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    padding: 2px 8px; border-radius: 3px;
+    border: 1px solid var(--border-bright);
+    color: var(--cyan); background: rgba(125,232,245,0.06);
+  }
+
+  /* ── Footer ── */
+  .page-footer {
+    position: relative; z-index: 1;
+    margin-top: 60px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    display: flex; justify-content: space-between;
+  }
+
+  /* ── Animations ── */
+  .section { animation: fadeUp 0.5s ease both; }
+  .section:nth-child(1) { animation-delay: 0.05s; }
+  .section:nth-child(2) { animation-delay: 0.15s; }
+  .section:nth-child(3) { animation-delay: 0.25s; }
+  .section:nth-child(4) { animation-delay: 0.35s; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 700px) {
+    .canvas-row.cols-3, .canvas-row.cols-4, .canvas-row.cols-5 {
+      grid-template-columns: 1fr 1fr;
+    }
+    .two-col, .three-col { grid-template-columns: 1fr; }
+    .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════ PAGE HEADER ══════════ -->
+<div class="page-header">
+  <div class="page-header-left">
+    <div class="eyebrow">UIUC · BIOE 484 · Statistical Image Analysis</div>
+    <h1>Image <span>Transforms</span>,<br>Relaxation &amp; Denoising</h1>
+  </div>
+  <div class="page-header-right">
+    NAME <span>Frank Lato</span><br>
+    TERM <span>Spring 2026</span><br>
+    <a href="index.html" style="color:var(--blue);text-decoration:none;font-size:9px;">← back to index</a>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 1: IMAGE TRANSFORMATIONS              -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-num">01</span>
+    <div class="section-title-text">
+      <h2>Image Transformations</h2>
+      <span class="sub">Geometric · Intensity · Frequency</span>
+    </div>
+  </div>
+
+  <!-- 1A: Intensity Transformations -->
+  <div class="card">
+    <div class="card-title">Intensity (Point) Transformations</div>
+    <div class="card-sub">pixel-wise mapping · s = T(r)</div>
+
+    <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px;">
+      A point transform maps each input intensity <em>r</em> to an output <em>s</em> independently, with no spatial context.
+    </p>
+
+    <div class="math">
+      s = T(r) &nbsp;<span class="comment">// general point mapping</span><br>
+      <span class="hi">Negative:</span> &nbsp; s = L − 1 − r &nbsp;<span class="comment">// L = max intensity (255)</span><br>
+      <span class="hi">Log:</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; s = c · log(1 + r) &nbsp;<span class="comment">// expand dark regions</span><br>
+      <span class="hi">Gamma:</span> &nbsp;&nbsp;&nbsp; s = c · r<sup>γ</sup> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// γ&lt;1 brighten, γ&gt;1 darken</span><br>
+      <span class="hi">Threshold:</span> s = 0 if r &lt; t, else 255
+    </div>
+
+    <div class="tab-row" id="intensityTabs">
+      <button class="btn active" data-tfm="original">Original</button>
+      <button class="btn" data-tfm="negative">Negative</button>
+      <button class="btn" data-tfm="log">Log</button>
+      <button class="btn" data-tfm="gamma_lo">Gamma γ=0.4</button>
+      <button class="btn" data-tfm="gamma_hi">Gamma γ=2.5</button>
+      <button class="btn" data-tfm="threshold">Threshold</button>
+      <button class="btn" data-tfm="equalize">Histogram Eq.</button>
+    </div>
+
+    <div class="canvas-row cols-3">
+      <div class="cvpanel">
+        <canvas id="itInput" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Input Image</strong>synthetic test pattern</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="itOutput" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Transformed</strong><span id="itLabel">original</span></div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="itCurve" width="180" height="180"></canvas>
+        <div class="clabel"><strong>T(r) Curve</strong>transfer function</div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <strong>Histogram Equalization</strong> is a special case: T(r) = (L−1) · CDF(r), where CDF is the cumulative distribution function of pixel intensities. It maximizes image contrast by spreading the histogram uniformly.
+    </div>
+  </div>
+
+  <!-- 1B: Geometric Transformations -->
+  <div class="card">
+    <div class="card-title">Geometric Transformations</div>
+    <div class="card-sub">spatial mapping · (x', y') = T(x, y)</div>
+
+    <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px;">
+      Geometric transforms remap pixel coordinates. All affine transforms can be expressed as a 3×3 homogeneous matrix.
+    </p>
+
+    <div class="math">
+      <span class="hi">Homogeneous form:</span><br>
+      [x']   [a  b  tx] [x]<br>
+      [y'] = [c  d  ty]·[y]<br>
+      [1 ]   [0  0  1 ] [1]<br><br>
+      <span class="hi">Translation:</span> &nbsp;a=d=1, b=c=0, (tx,ty) = shift<br>
+      <span class="hi">Rotation θ:</span> &nbsp; a=cosθ, b=−sinθ, c=sinθ, d=cosθ<br>
+      <span class="hi">Scale:</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; a=sx, d=sy, b=c=0<br>
+      <span class="hi">Shear:</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; a=d=1, b=shx, c=shy<br><br>
+      <span class="comment">// Backward mapping (inverse warp) avoids holes:</span><br>
+      <span class="hi2">I_out(x',y') = I_in(T⁻¹(x',y'))</span> + <span class="hi3">bilinear interpolation</span>
+    </div>
+
+    <div class="tab-row" id="geoTabs">
+      <button class="btn active" data-geo="original">Original</button>
+      <button class="btn" data-geo="translate">Translate</button>
+      <button class="btn" data-geo="rotate">Rotate 30°</button>
+      <button class="btn" data-geo="scale">Scale 0.7×</button>
+      <button class="btn" data-geo="shear">Shear</button>
+      <button class="btn" data-geo="flip">Flip H</button>
+    </div>
+
+    <div class="canvas-row cols-2">
+      <div class="cvpanel">
+        <canvas id="geoInput" width="200" height="200"></canvas>
+        <div class="clabel"><strong>Input</strong>grid + shapes</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="geoOutput" width="200" height="200"></canvas>
+        <div class="clabel"><strong>Transformed</strong><span id="geoLabel">original</span></div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <strong>Forward vs. Backward mapping:</strong> Forward mapping (push each source pixel to its destination) can leave holes. Backward mapping (for each output pixel, find where it came from) guarantees full coverage and enables sub-pixel <strong>bilinear interpolation</strong>: I(x,y) = (1−α)(1−β)·I₀₀ + α(1−β)·I₁₀ + (1−α)β·I₀₁ + αβ·I₁₁.
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 2: IMAGE RELAXATION                   -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-num">02</span>
+    <div class="section-title-text">
+      <h2>Image Relaxation</h2>
+      <span class="sub">Iterative smoothing · MRF · Energy minimization</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Relaxation as Energy Minimization</div>
+    <div class="card-sub">Markov Random Field (MRF) framework</div>
+
+    <p style="font-size:13px;color:var(--text-mid);margin-bottom:14px;">
+      Image relaxation iteratively updates pixel values to minimize a global energy functional that balances <em>data fidelity</em> (stay close to observations) and <em>smoothness</em> (agree with neighbors).
+    </p>
+
+    <div class="math">
+      <span class="hi">Energy functional:</span><br>
+      E(u) = <span class="hi2">λ·∑ᵢ(uᵢ − fᵢ)²</span> + <span class="hi3">∑ᵢⱼ (uᵢ − uⱼ)²</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// data term &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// smoothness term</span><br><br>
+      <span class="hi">Gradient descent update:</span><br>
+      uᵢ<sup>(t+1)</sup> = uᵢ<sup>(t)</sup> − α · ∂E/∂uᵢ<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = uᵢ<sup>(t)</sup> − α · [2λ(uᵢ−fᵢ) + 2∑ⱼ∈N(i)(uᵢ−uⱼ)]<br><br>
+      <span class="hi">Fixed-point (mean-field) form:</span><br>
+      uᵢ<sup>(t+1)</sup> = <span class="hi2">λ·fᵢ</span> + <span class="hi3">(1/|N|)·∑ⱼ∈N(i) uⱼ<sup>(t)</sup></span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// (normalized, λ=1 case)</span>
+    </div>
+
+    <div class="two-col" style="margin-top:16px;">
+      <div>
+        <div class="controls">
+          <label>λ (data weight):</label>
+          <input type="range" id="lambdaSlider" min="0" max="100" value="30">
+          <span id="lambdaVal">0.30</span>
+        </div>
+        <div class="controls">
+          <label>Iterations:</label>
+          <button class="btn" id="relaxStep">+ 1 step</button>
+          <button class="btn" id="relaxRun">Run 20</button>
+          <button class="btn" id="relaxReset">Reset</button>
+          <span class="badge" id="relaxIter">iter: 0</span>
+        </div>
+        <div class="controls">
+          <label>Noise type:</label>
+          <select id="relaxNoise">
+            <option value="gaussian">Gaussian</option>
+            <option value="sp">Salt &amp; Pepper</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <canvas id="energyPlot" width="280" height="140" style="border:1px solid var(--border);border-radius:5px;width:100%;"></canvas>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:6px;text-align:center">
+          Energy E(u) vs. iteration
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-row cols-3" style="margin-top:10px">
+      <div class="cvpanel">
+        <canvas id="relaxOrig" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Original (f)</strong>clean reference</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="relaxNoisy" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Observed (f + noise)</strong>degraded input</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="relaxResult" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Relaxed (u<sup>t</sup>)</strong><span id="relaxIterLabel">iter: 0</span></div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <strong>Convergence:</strong> The fixed-point iteration converges when E(u) stops decreasing. Large λ keeps the result close to the noisy observation; small λ produces heavy smoothing. The optimal λ trades off bias vs. variance — this is the bias-variance dilemma in spatial form.
+      <br><br>
+      <strong>MRF connection:</strong> The energy above corresponds to a Gaussian MRF. Gibbs sampling and belief propagation are used for discrete-label MRFs (e.g., binary segmentation), where the smoothness term penalizes label discontinuities.
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 3: IMAGE DENOISING                    -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">
+    <span class="section-num">03</span>
+    <div class="section-title-text">
+      <h2>Image Denoising</h2>
+      <span class="sub">Mean · Median · Bilateral · Total Variation · NLM</span>
+    </div>
+  </div>
+
+  <!-- 3A: Mean filter -->
+  <div class="card">
+    <div class="card-title">Mean Filter (Box Filter)</div>
+    <div class="card-sub">linear · spatially invariant</div>
+    <div class="math">
+      û(x,y) = <span class="hi">1/|W|</span> · <span class="hi2">∑<sub>(s,t)∈W</sub> f(x+s, y+t)</span><br>
+      <span class="comment">// W = k×k window, |W| = k²</span><br>
+      <span class="comment">// equivalent to convolution with box kernel h = (1/k²)·𝟏ₖₓₖ</span>
+    </div>
+    <div class="insight">
+      Simple and fast (separable, O(n²) per image), but <strong>blurs edges</strong> because it treats all neighbors equally regardless of intensity similarity.
+    </div>
+  </div>
+
+  <!-- 3B: Median filter -->
+  <div class="card">
+    <div class="card-title">Median Filter</div>
+    <div class="card-sub">non-linear · rank-order · robust to outliers</div>
+    <div class="math">
+      û(x,y) = <span class="hi">median</span><sub>(s,t)∈W</sub> { f(x+s, y+t) }<br>
+      <span class="comment">// sort values in window W, take middle value</span><br>
+      <span class="comment">// optimal for salt-and-pepper (impulse) noise</span>
+    </div>
+    <div class="insight">
+      The median is a <strong>robust estimator</strong> — a single outlier (salt or pepper pixel) cannot pull the output far from the true value. It preserves edges better than the mean filter for low-amplitude signals.
+    </div>
+  </div>
+
+  <!-- 3C: Bilateral filter -->
+  <div class="card">
+    <div class="card-title">Bilateral Filter</div>
+    <div class="card-sub">non-linear · edge-preserving · domain + range weighting</div>
+    <div class="math">
+      û(x,y) = <span class="hi">1/W_p</span> · ∑<sub>q∈W</sub> f(q) · <span class="hi2">G_σ_d(||p−q||)</span> · <span class="hi3">G_σ_r(|f(p)−f(q)|)</span><br><br>
+      &nbsp;&nbsp;<span class="comment">// &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spatial Gaussian &nbsp;&nbsp;&nbsp;&nbsp; range Gaussian</span><br><br>
+      W_p = ∑<sub>q</sub> G_σ_d · G_σ_r &nbsp;<span class="comment">// normalization</span><br><br>
+      G_σ_d(||p−q||) = exp(−||p−q||²/2σ_d²)<br>
+      G_σ_r(|Δf|) &nbsp; = exp(−|Δf|²/2σ_r²)
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="controls">
+          <label>σ_d (spatial):</label>
+          <input type="range" id="bilSd" min="3" max="20" value="8">
+          <span id="bilSdVal">0.8</span>
+        </div>
+        <div class="controls">
+          <label>σ_r (range):</label>
+          <input type="range" id="bilSr" min="5" max="80" value="30">
+          <span id="bilSrVal">30</span>
+        </div>
+        <button class="btn" id="bilRun" style="margin-top:8px">Apply Bilateral</button>
+      </div>
+      <div style="font-size:13px;color:var(--text-mid);line-height:1.7;">
+        σ_d controls spatial reach.<br>σ_r controls how aggressively edges are preserved — large σ_r → approaches a Gaussian blur; small σ_r → only averages nearly-identical pixels.
+      </div>
+    </div>
+
+    <div class="canvas-row cols-3" style="margin-top:14px">
+      <div class="cvpanel">
+        <canvas id="bilOrig" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Noisy Input</strong></div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="bilMean" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Mean Filter</strong>blurs edges</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="bilResult" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Bilateral</strong>edges preserved</div>
+      </div>
+    </div>
+
+    <div class="insight">
+      The bilateral filter is <strong>not shift-invariant</strong> — the weights change at every pixel location depending on intensity differences. This makes it non-linear and non-convolutive, but it's the key property that lets it smooth flat regions while leaving edges sharp.
+    </div>
+  </div>
+
+  <!-- 3D: Total Variation -->
+  <div class="card">
+    <div class="card-title">Total Variation (TV) Denoising</div>
+    <div class="card-sub">variational · promotes piecewise-constant solutions · ROF model</div>
+    <div class="math">
+      <span class="hi">ROF functional (Rudin-Osher-Fatemi):</span><br>
+      min_u &nbsp; E(u) = <span class="hi2">λ/2 · ||u − f||²</span> &nbsp;+&nbsp; <span class="hi3">||∇u||₁</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// fidelity (L2) &nbsp;&nbsp;&nbsp; total variation (L1)</span><br><br>
+      TV(u) = ∫∫ |∇u| dx dy ≈ ∑ᵢⱼ √[(uᵢ₊₁,ⱼ−uᵢⱼ)² + (uᵢ,ⱼ₊₁−uᵢⱼ)²]<br><br>
+      <span class="hi">Gradient descent (subgradient):</span><br>
+      u<sup>(t+1)</sup> = u<sup>(t)</sup> − dt · [<span class="hi2">λ(u−f)</span> − <span class="hi3">div(∇u/|∇u|)</span>]<br>
+      <span class="comment">// div(∇u/|∇u|) = mean curvature of level sets</span>
+    </div>
+
+    <div class="controls">
+      <label>λ:</label>
+      <input type="range" id="tvLambda" min="1" max="50" value="15">
+      <span id="tvLambdaVal">0.15</span>
+      <label>iterations:</label>
+      <input type="range" id="tvIter" min="5" max="80" value="25">
+      <span id="tvIterVal">25</span>
+      <button class="btn" id="tvRun">Apply TV</button>
+    </div>
+
+    <div class="canvas-row cols-3">
+      <div class="cvpanel">
+        <canvas id="tvOrig" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Noisy Input</strong></div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="tvGauss" width="180" height="180"></canvas>
+        <div class="clabel"><strong>Gaussian Blur</strong>blurs edges</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="tvResult" width="180" height="180"></canvas>
+        <div class="clabel"><strong>TV Denoised</strong>piecewise flat</div>
+      </div>
+    </div>
+
+    <div class="insight">
+      The L1 total variation penalty promotes <strong>piecewise-constant</strong> solutions (cartoon-like images) — it strongly favors flat regions separated by sharp edges, unlike L2 which would produce blurry transitions. TV denoising is widely used in MRI reconstruction and CT imaging.
+    </div>
+  </div>
+
+  <!-- 3E: Denoising comparison -->
+  <div class="card">
+    <div class="card-title">Denoising Method Comparison</div>
+    <div class="card-sub">mean · median · gaussian · bilateral · TV</div>
+
+    <div class="controls">
+      <label>Noise σ:</label>
+      <input type="range" id="cmpNoise" min="5" max="60" value="25">
+      <span id="cmpNoiseVal">25</span>
+      <button class="btn" id="cmpRun">Regenerate</button>
+    </div>
+
+    <div class="canvas-row cols-5" style="margin-top:16px">
+      <div class="cvpanel">
+        <canvas id="cmpNoisy" width="160" height="160"></canvas>
+        <div class="clabel"><strong>Noisy</strong></div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="cmpMean" width="160" height="160"></canvas>
+        <div class="clabel"><strong>Mean</strong>k=5</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="cmpMedian" width="160" height="160"></canvas>
+        <div class="clabel"><strong>Median</strong>k=5</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="cmpBilateral" width="160" height="160"></canvas>
+        <div class="clabel"><strong>Bilateral</strong>σd=3,σr=30</div>
+      </div>
+      <div class="cvpanel">
+        <canvas id="cmpTV" width="160" height="160"></canvas>
+        <div class="clabel"><strong>TV</strong>λ=0.15</div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <strong>Key tradeoffs:</strong> Mean filter is fastest but blurs edges. Median excels at impulse noise. Gaussian blur is equivalent to mean but with distance-weighted kernel. Bilateral preserves edges but is computationally heavier (O(k²) per pixel, non-separable). TV produces piecewise-flat regions closest to true anatomical structure in medical imaging.
+    </div>
+  </div>
+</div>
+
+<div class="page-footer">
+  <span>// Frank Lato · BIOE 484 · Statistical Image Analysis · Spring 2026</span>
+  <span id="pgDate"></span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════
+const clamp = (v,lo,hi) => Math.max(lo,Math.min(hi,v));
+const lerp  = (a,b,t) => a+(b-a)*t;
+
+function makeCtx(id) {
+  const c = document.getElementById(id);
+  return { c, ctx: c.getContext('2d'), w: c.width, h: c.height };
+}
+
+function renderGray(canvas, data, w, h, scale=1, offset=0) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = w; canvas.height = h;
+  const id = ctx.createImageData(w, h);
+  for (let i = 0; i < w*h; i++) {
+    const v = clamp(data[i]*scale+offset, 0, 255)|0;
+    id.data[4*i]   = v;
+    id.data[4*i+1] = v;
+    id.data[4*i+2] = v;
+    id.data[4*i+3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+}
+
+function gaussNoise(data, sigma) {
+  return data.map(v => clamp(v + randn()*sigma, 0, 255));
+}
+function spNoise(data, prob=0.05) {
+  return data.map(v => Math.random()<prob ? (Math.random()<0.5?0:255) : v);
+}
+function randn() {
+  let u=0,v=0;
+  while(u===0) u=Math.random();
+  while(v===0) v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+// ── Synthetic test image ──
+function makeTestImage(w, h) {
+  const d = new Float32Array(w*h);
+  for (let y=0; y<h; y++) {
+    for (let x=0; x<w; x++) {
+      let v = 30;
+      // Rectangle
+      if (x>20&&x<80&&y>20&&y<70) v=200;
+      // Circle
+      const dx=x-130,dy=y-80;
+      if (dx*dx+dy*dy<1100) v=160;
+      // Diagonal gradient strip
+      if (x>90&&x<120) v=clamp(30+(y/h)*200,0,255);
+      // Small bright circle
+      const dx2=x-50,dy2=y-130;
+      if (dx2*dx2+dy2*dy2<400) v=240;
+      // Dark rectangle
+      if (x>120&&x<175&&y>110&&y<165) v=50;
+      d[y*w+x] = v;
+    }
+  }
+  return d;
+}
+
+// ── Convolutions ──
+function meanFilter(data, w, h, k=5) {
+  const half=Math.floor(k/2), out=new Float32Array(w*h);
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+    let s=0,n=0;
+    for (let ky=-half;ky<=half;ky++) for (let kx=-half;kx<=half;kx++) {
+      const nx=clamp(x+kx,0,w-1), ny=clamp(y+ky,0,h-1);
+      s+=data[ny*w+nx]; n++;
+    }
+    out[y*w+x]=s/n;
+  }
+  return out;
+}
+
+function medianFilter(data, w, h, k=5) {
+  const half=Math.floor(k/2), out=new Float32Array(w*h), buf=[];
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+    buf.length=0;
+    for (let ky=-half;ky<=half;ky++) for (let kx=-half;kx<=half;kx++) {
+      const nx=clamp(x+kx,0,w-1), ny=clamp(y+ky,0,h-1);
+      buf.push(data[ny*w+nx]);
+    }
+    buf.sort((a,b)=>a-b);
+    out[y*w+x]=buf[buf.length>>1];
+  }
+  return out;
+}
+
+function gaussianBlur(data, w, h, sigma=2) {
+  const ksize=Math.ceil(sigma*4)*2+1, half=Math.floor(ksize/2);
+  const k1d=[]; let ksum=0;
+  for(let i=0;i<ksize;i++){const x=i-half;const v=Math.exp(-x*x/(2*sigma*sigma));k1d.push(v);ksum+=v;}
+  for(let i=0;i<ksize;i++) k1d[i]/=ksum;
+  // separable
+  const tmp=new Float32Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let s=0;
+    for(let i=0;i<ksize;i++){const nx=clamp(x+i-half,0,w-1);s+=data[y*w+nx]*k1d[i];}
+    tmp[y*w+x]=s;
+  }
+  const out=new Float32Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let s=0;
+    for(let i=0;i<ksize;i++){const ny=clamp(y+i-half,0,h-1);s+=tmp[ny*w+x]*k1d[i];}
+    out[y*w+x]=s;
+  }
+  return out;
+}
+
+function bilateralFilter(data, w, h, sigmaD=3, sigmaR=30) {
+  const ksize=Math.ceil(sigmaD*3)*2+1, half=Math.floor(ksize/2);
+  const out=new Float32Array(w*h);
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    let s=0, wsum=0;
+    const c=data[y*w+x];
+    for(let ky=-half;ky<=half;ky++) for(let kx=-half;kx<=half;kx++){
+      const nx=clamp(x+kx,0,w-1), ny=clamp(y+ky,0,h-1);
+      const val=data[ny*w+nx];
+      const wd=Math.exp(-(kx*kx+ky*ky)/(2*sigmaD*sigmaD));
+      const wr=Math.exp(-((val-c)*(val-c))/(2*sigmaR*sigmaR));
+      const wt=wd*wr; s+=val*wt; wsum+=wt;
+    }
+    out[y*w+x]=s/wsum;
+  }
+  return out;
+}
+
+function tvDenoise(data, w, h, lambda=0.15, iters=25, dt=0.1) {
+  let u=data.slice();
+  for(let iter=0;iter<iters;iter++){
+    const next=new Float32Array(w*h);
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const i=y*w+x;
+      const xp=clamp(x+1,0,w-1), xm=clamp(x-1,0,w-1);
+      const yp=clamp(y+1,0,h-1), ym=clamp(y-1,0,h-1);
+      const ux=u[y*w+xp]-u[i], uy=u[yp*w+x]-u[i];
+      const norm=Math.sqrt(ux*ux+uy*uy)+1e-6;
+      // div of normalized gradient (approx)
+      const dxp=(u[y*w+xp]-u[i])/Math.sqrt((u[y*w+xp]-u[i])**2+(u[yp*w+xp]-u[y*w+xp])**2+1e-6);
+      const dxm=(u[i]-u[y*w+xm])/Math.sqrt((u[i]-u[y*w+xm])**2+(u[yp*w+xm]-u[ym*w+xm])**2/4+1e-6);
+      const dyp=(u[yp*w+x]-u[i])/Math.sqrt((u[yp*w+xp]-u[yp*w+x])**2/4+(u[yp*w+x]-u[i])**2+1e-6);
+      const dym=(u[i]-u[ym*w+x])/Math.sqrt((u[ym*w+xp]-u[ym*w+xm])**2/4+(u[i]-u[ym*w+x])**2+1e-6);
+      const divterm=(dxp-dxm+dyp-dym);
+      next[i]=u[i]-dt*(lambda*(u[i]-data[i])-divterm);
+    }
+    u=next;
+  }
+  return u;
+}
+
+// ═══════════════════════════════════════════
+// SECTION 1A: INTENSITY TRANSFORMS
+// ═══════════════════════════════════════════
+const IT_W=180, IT_H=180;
+const itBase=makeTestImage(IT_W,IT_H);
+
+function applyIntensity(name) {
+  const out=new Float32Array(IT_W*IT_H);
+  // histogram for equalization
+  const hist=new Array(256).fill(0);
+  itBase.forEach(v=>{hist[clamp(v|0,0,255)]++;});
+  const cdf=hist.slice();
+  for(let i=1;i<256;i++) cdf[i]+=cdf[i-1];
+  const cdfMin=cdf.find(v=>v>0)||1;
+  const n=IT_W*IT_H;
+
+  for(let i=0;i<IT_W*IT_H;i++){
+    const r=itBase[i];
+    let s;
+    switch(name){
+      case 'negative':  s=255-r; break;
+      case 'log':       s=clamp(50*Math.log(1+r),0,255); break;
+      case 'gamma_lo':  s=clamp(255*Math.pow(r/255,0.4),0,255); break;
+      case 'gamma_hi':  s=clamp(255*Math.pow(r/255,2.5),0,255); break;
+      case 'threshold': s=r<128?0:255; break;
+      case 'equalize': {
+        const ri=clamp(r|0,0,255);
+        s=clamp(Math.round(255*(cdf[ri]-cdfMin)/(n-cdfMin)),0,255); break;
+      }
+      default: s=r;
+    }
+    out[i]=s;
+  }
+  return out;
+}
+
+function drawTransferCurve(canvas, name) {
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width, h=canvas.height;
+  ctx.fillStyle='#0d0f1a'; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='#1a1e35'; ctx.lineWidth=1;
+  // grid
+  for(let i=0;i<=4;i++){
+    const x=i*(w/4), y=i*(h/4);
+    ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+  }
+  // diagonal reference
+  ctx.strokeStyle='rgba(74,158,255,0.2)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(0,h);ctx.lineTo(w,0);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // build cdf for equalize
+  const hist=new Array(256).fill(0);
+  itBase.forEach(v=>{hist[clamp(v|0,0,255)]++;});
+  const cdf=hist.slice();
+  for(let i=1;i<256;i++) cdf[i]+=cdf[i-1];
+  const cdfMin=cdf.find(v=>v>0)||1;
+  const n=IT_W*IT_H;
+
+  ctx.strokeStyle='#7de8f5'; ctx.lineWidth=2;
+  ctx.beginPath();
+  for(let r=0;r<=255;r++){
+    let s;
+    switch(name){
+      case 'negative':  s=255-r; break;
+      case 'log':       s=clamp(50*Math.log(1+r),0,255); break;
+      case 'gamma_lo':  s=clamp(255*Math.pow(r/255,0.4),0,255); break;
+      case 'gamma_hi':  s=clamp(255*Math.pow(r/255,2.5),0,255); break;
+      case 'threshold': s=r<128?0:255; break;
+      case 'equalize':{
+        const ri=clamp(r|0,0,255);
+        s=clamp(Math.round(255*(cdf[ri]-cdfMin)/(n-cdfMin)),0,255); break;
+      }
+      default: s=r;
+    }
+    const px=r*(w/255), py=h-(s/255)*h;
+    r===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+
+  // labels
+  ctx.fillStyle='#4a5280'; ctx.font='9px DM Mono,monospace';
+  ctx.fillText('r →',w-24,h-4);
+  ctx.save(); ctx.translate(8,20); ctx.rotate(-Math.PI/2);
+  ctx.fillText('s ↑',0,0); ctx.restore();
+}
+
+// init
+renderGray(document.getElementById('itInput'),itBase,IT_W,IT_H);
+renderGray(document.getElementById('itOutput'),applyIntensity('original'),IT_W,IT_H);
+drawTransferCurve(document.getElementById('itCurve'),'original');
+
+document.getElementById('intensityTabs').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-tfm]');
+  if(!btn)return;
+  document.querySelectorAll('#intensityTabs .btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const tfm=btn.dataset.tfm;
+  document.getElementById('itLabel').textContent=tfm.replace('_',' ');
+  renderGray(document.getElementById('itOutput'),applyIntensity(tfm),IT_W,IT_H);
+  drawTransferCurve(document.getElementById('itCurve'),tfm);
+});
+
+// ═══════════════════════════════════════════
+// SECTION 1B: GEOMETRIC TRANSFORMS
+// ═══════════════════════════════════════════
+const GEO_W=200, GEO_H=200;
+const geoBase=makeTestImage(GEO_W,GEO_H);
+
+function applyGeo(name) {
+  const out=new Float32Array(GEO_W*GEO_H);
+  const cx=GEO_W/2, cy=GEO_H/2;
+  for(let y=0;y<GEO_H;y++) for(let x=0;x<GEO_W;x++){
+    let sx=x, sy=y;
+    switch(name){
+      case 'translate': sx=x-20; sy=y-20; break;
+      case 'rotate': {
+        const a=30*Math.PI/180;
+        const dx=x-cx, dy=y-cy;
+        sx=cx+dx*Math.cos(a)+dy*Math.sin(a);
+        sy=cy-dx*Math.sin(a)+dy*Math.cos(a);
+        break;
+      }
+      case 'scale': {
+        const s=0.7;
+        sx=cx+(x-cx)/s; sy=cy+(y-cy)/s; break;
+      }
+      case 'shear': {
+        const sh=0.35;
+        sx=x-sh*(y-cy); sy=y; break;
+      }
+      case 'flip': sx=GEO_W-1-x; sy=y; break;
+    }
+    // bilinear interpolation
+    const ix=Math.floor(sx), iy=Math.floor(sy);
+    const fx=sx-ix, fy=sy-iy;
+    if(ix<0||iy<0||ix>=GEO_W-1||iy>=GEO_H-1){out[y*GEO_W+x]=0;continue;}
+    const i00=geoBase[iy*GEO_W+ix];
+    const i10=geoBase[iy*GEO_W+ix+1];
+    const i01=geoBase[(iy+1)*GEO_W+ix];
+    const i11=geoBase[(iy+1)*GEO_W+ix+1];
+    out[y*GEO_W+x]=(1-fx)*(1-fy)*i00+fx*(1-fy)*i10+(1-fx)*fy*i01+fx*fy*i11;
+  }
+  return out;
+}
+
+renderGray(document.getElementById('geoInput'),geoBase,GEO_W,GEO_H);
+renderGray(document.getElementById('geoOutput'),applyGeo('original'),GEO_W,GEO_H);
+
+document.getElementById('geoTabs').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-geo]');
+  if(!btn)return;
+  document.querySelectorAll('#geoTabs .btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const geo=btn.dataset.geo;
+  document.getElementById('geoLabel').textContent=geo;
+  renderGray(document.getElementById('geoOutput'),applyGeo(geo),GEO_W,GEO_H);
+});
+
+// ═══════════════════════════════════════════
+// SECTION 2: RELAXATION
+// ═══════════════════════════════════════════
+const RX_W=180, RX_H=180;
+const rxBase=makeTestImage(RX_W,RX_H);
+let rxNoisy=gaussNoise(rxBase,30);
+let rxCurrent=rxNoisy.slice();
+let rxIter=0;
+let rxEnergyHistory=[];
+
+function computeEnergy(u, f, lambda) {
+  let e=0;
+  const n=RX_W*RX_H;
+  for(let y=0;y<RX_H;y++) for(let x=0;x<RX_W;x++){
+    const i=y*RX_W+x;
+    const diff=u[i]-f[i]; e+=lambda*diff*diff;
+    if(x<RX_W-1){const d=u[i]-u[y*RX_W+x+1];e+=d*d;}
+    if(y<RX_H-1){const d=u[i]-u[(y+1)*RX_W+x];e+=d*d;}
+  }
+  return e/n;
+}
+
+function relaxStep(u, f, lambda) {
+  const out=new Float32Array(RX_W*RX_H);
+  for(let y=0;y<RX_H;y++) for(let x=0;x<RX_W;x++){
+    const i=y*RX_W+x;
+    const xp=clamp(x+1,0,RX_W-1), xm=clamp(x-1,0,RX_W-1);
+    const yp=clamp(y+1,0,RX_H-1), ym=clamp(y-1,0,RX_H-1);
+    const neighborSum=u[y*RX_W+xp]+u[y*RX_W+xm]+u[yp*RX_W+x]+u[ym*RX_W+x];
+    out[i]=(lambda*f[i]+neighborSum)/(lambda+4);
+  }
+  return out;
+}
+
+function drawEnergyPlot() {
+  const canvas=document.getElementById('energyPlot');
+  const ctx=canvas.getContext('2d');
+  const w=canvas.offsetWidth||280, h=canvas.offsetHeight||140;
+  canvas.width=w; canvas.height=h;
+  ctx.fillStyle='#0c0e18'; ctx.fillRect(0,0,w,h);
+  if(rxEnergyHistory.length<2)return;
+  const mx=Math.max(...rxEnergyHistory)*1.05;
+  const mn=Math.min(...rxEnergyHistory)*0.95;
+  ctx.strokeStyle='#4a9eff'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  rxEnergyHistory.forEach((e,i)=>{
+    const px=(i/(rxEnergyHistory.length-1))*w;
+    const py=h-(e-mn)/(mx-mn)*h*0.85-h*0.05;
+    i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  });
+  ctx.stroke();
+  // labels
+  ctx.fillStyle='#4a5280'; ctx.font='9px DM Mono,monospace';
+  ctx.fillText('E(u)',4,12);
+  ctx.fillText('iter →',w-42,h-4);
+}
+
+function refreshRelax() {
+  renderGray(document.getElementById('relaxOrig'),rxBase,RX_W,RX_H);
+  renderGray(document.getElementById('relaxNoisy'),rxNoisy,RX_W,RX_H);
+  renderGray(document.getElementById('relaxResult'),rxCurrent,RX_W,RX_H);
+  document.getElementById('relaxIter').textContent='iter: '+rxIter;
+  document.getElementById('relaxIterLabel').textContent='iter: '+rxIter;
+  drawEnergyPlot();
+}
+
+function getLambda() { return +document.getElementById('lambdaSlider').value/100; }
+
+document.getElementById('lambdaSlider').addEventListener('input',e=>{
+  document.getElementById('lambdaVal').textContent=(+e.target.value/100).toFixed(2);
+});
+
+document.getElementById('relaxNoise').addEventListener('change',e=>{
+  rxNoisy=e.target.value==='sp'?spNoise(rxBase,0.08):gaussNoise(rxBase,30);
+  rxCurrent=rxNoisy.slice(); rxIter=0; rxEnergyHistory=[];
+  refreshRelax();
+});
+
+document.getElementById('relaxStep').addEventListener('click',()=>{
+  const lam=getLambda();
+  rxEnergyHistory.push(computeEnergy(rxCurrent,rxNoisy,lam));
+  rxCurrent=relaxStep(rxCurrent,rxNoisy,lam);
+  rxIter++;
+  refreshRelax();
+});
+
+document.getElementById('relaxRun').addEventListener('click',()=>{
+  const lam=getLambda();
+  for(let i=0;i<20;i++){
+    rxEnergyHistory.push(computeEnergy(rxCurrent,rxNoisy,lam));
+    rxCurrent=relaxStep(rxCurrent,rxNoisy,lam);
+    rxIter++;
+  }
+  refreshRelax();
+});
+
+document.getElementById('relaxReset').addEventListener('click',()=>{
+  rxNoisy=document.getElementById('relaxNoise').value==='sp'?spNoise(rxBase,0.08):gaussNoise(rxBase,30);
+  rxCurrent=rxNoisy.slice(); rxIter=0; rxEnergyHistory=[];
+  refreshRelax();
+});
+
+refreshRelax();
+
+// ═══════════════════════════════════════════
+// SECTION 3: BILATERAL + TV
+// ═══════════════════════════════════════════
+const DN_W=180, DN_H=180;
+const dnBase=makeTestImage(DN_W,DN_H);
+const dnNoisy=gaussNoise(dnBase,28);
+
+function initDenoise() {
+  renderGray(document.getElementById('bilOrig'),dnNoisy,DN_W,DN_H);
+  renderGray(document.getElementById('bilMean'),meanFilter(dnNoisy,DN_W,DN_H,5),DN_W,DN_H);
+  renderGray(document.getElementById('bilResult'),bilateralFilter(dnNoisy,DN_W,DN_H,3,30),DN_W,DN_H);
+  renderGray(document.getElementById('tvOrig'),dnNoisy,DN_W,DN_H);
+  renderGray(document.getElementById('tvGauss'),gaussianBlur(dnNoisy,DN_W,DN_H,2),DN_W,DN_H);
+  renderGray(document.getElementById('tvResult'),tvDenoise(dnNoisy,DN_W,DN_H,0.15,25),DN_W,DN_H);
+}
+
+document.getElementById('bilSd').addEventListener('input',e=>{
+  document.getElementById('bilSdVal').textContent=(+e.target.value/10).toFixed(1);
+});
+document.getElementById('bilSr').addEventListener('input',e=>{
+  document.getElementById('bilSrVal').textContent=e.target.value;
+});
+document.getElementById('bilRun').addEventListener('click',()=>{
+  const sd=+document.getElementById('bilSd').value/10*3;
+  const sr=+document.getElementById('bilSr').value;
+  renderGray(document.getElementById('bilResult'),bilateralFilter(dnNoisy,DN_W,DN_H,sd,sr),DN_W,DN_H);
+});
+
+document.getElementById('tvLambda').addEventListener('input',e=>{
+  document.getElementById('tvLambdaVal').textContent=(+e.target.value/100).toFixed(2);
+});
+document.getElementById('tvIter').addEventListener('input',e=>{
+  document.getElementById('tvIterVal').textContent=e.target.value;
+});
+document.getElementById('tvRun').addEventListener('click',()=>{
+  const lam=+document.getElementById('tvLambda').value/100;
+  const iters=+document.getElementById('tvIter').value;
+  renderGray(document.getElementById('tvResult'),tvDenoise(dnNoisy,DN_W,DN_H,lam,iters),DN_W,DN_H);
+});
+
+initDenoise();
+
+// ═══════════════════════════════════════════
+// SECTION 3E: COMPARISON
+// ═══════════════════════════════════════════
+const CMP_W=160, CMP_H=160;
+const cmpBase=makeTestImage(CMP_W,CMP_H);
+
+function runComparison() {
+  const sigma=+document.getElementById('cmpNoise').value;
+  const noisy=gaussNoise(cmpBase,sigma);
+  renderGray(document.getElementById('cmpNoisy'),noisy,CMP_W,CMP_H);
+  renderGray(document.getElementById('cmpMean'),meanFilter(noisy,CMP_W,CMP_H,5),CMP_W,CMP_H);
+  renderGray(document.getElementById('cmpMedian'),medianFilter(noisy,CMP_W,CMP_H,5),CMP_W,CMP_H);
+  renderGray(document.getElementById('cmpBilateral'),bilateralFilter(noisy,CMP_W,CMP_H,3,30),CMP_W,CMP_H);
+  renderGray(document.getElementById('cmpTV'),tvDenoise(noisy,CMP_W,CMP_H,0.15,20),CMP_W,CMP_H);
+}
+
+document.getElementById('cmpNoise').addEventListener('input',e=>{
+  document.getElementById('cmpNoiseVal').textContent=e.target.value;
+});
+document.getElementById('cmpRun').addEventListener('click',runComparison);
+runComparison();
+
+// ── Footer date ──
+document.getElementById('pgDate').textContent=new Date().toISOString().slice(0,10);
+</script>
+</body>
+</html>
