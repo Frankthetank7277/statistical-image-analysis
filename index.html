@@ -3,21 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- EDIT: Page tab title -->
-<title>Signals & Systems</title>
+<title>Statistical Image Analysis</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');
 
   :root {
-    --bg: #020c06;
-    --surface: #041a0b;
-    --border: #0a3a18;
-    --phosphor: #00ff6a;
-    --phosphor-dim: #004d20;
-    --phosphor-glow: rgba(0, 255, 106, 0.15);
-    --text: #c8ffd8;
-    --dim: #2d7a48;
-    --grid: rgba(0, 255, 106, 0.04);
+    --bg: #07080f;
+    --surface: #0c0e18;
+    --surface2: #111422;
+    --border: #1a1e35;
+    --border-bright: #2a3060;
+    --blue: #4a9eff;
+    --blue-dim: #1a3a6e;
+    --blue-glow: rgba(74, 158, 255, 0.12);
+    --cyan: #7de8f5;
+    --cyan-dim: rgba(125, 232, 245, 0.15);
+    --text: #cdd6f4;
+    --text-dim: #4a5280;
+    --text-mid: #7a84b0;
+    --green: #a6e3a1;
+    --red: #f38ba8;
+    --yellow: #f9e2af;
+    --mauve: #cba6f7;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -25,329 +32,439 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
     min-height: 100vh;
-    padding: 50px 40px;
-    max-width: 720px;
+    padding: 48px 40px 80px;
+    max-width: 760px;
     margin: 0 auto;
     position: relative;
     overflow-x: hidden;
   }
 
-  /* Oscilloscope grid background */
+  /* Radial gradient atmosphere */
   body::before {
     content: '';
     position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(var(--grid) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-    background-size: 40px 40px;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(74,158,255,0.06) 0%, transparent 70%);
     pointer-events: none;
     z-index: 0;
   }
 
-  /* Subtle scanline overlay */
+  /* Fine dot-matrix background — medical display feel */
   body::after {
     content: '';
     position: fixed;
     inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.08) 2px,
-      rgba(0,0,0,0.08) 4px
-    );
+    background-image: radial-gradient(circle, rgba(74,158,255,0.08) 1px, transparent 1px);
+    background-size: 28px 28px;
     pointer-events: none;
     z-index: 0;
   }
 
-  /* Animated waveform header strip */
-  .waveform-strip {
+  /* ── Scan header canvas ── */
+  .scan-header {
     position: relative;
     z-index: 1;
-    height: 60px;
-    margin-bottom: 30px;
-    overflow: hidden;
-  }
-
-  .waveform-strip svg {
     width: 100%;
-    height: 100%;
+    height: 90px;
+    margin-bottom: 36px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
   }
+  #scanCanvas { display: block; width: 100%; height: 100%; }
 
-  .wave-path {
-    fill: none;
-    stroke: var(--phosphor);
-    stroke-width: 1.5;
-    filter: drop-shadow(0 0 4px var(--phosphor));
-    stroke-dasharray: 1200;
-    stroke-dashoffset: 1200;
-    animation: drawWave 2s ease forwards;
-  }
-
-  @keyframes drawWave {
-    to { stroke-dashoffset: 0; }
-  }
-
-  /* Header */
-  .header { position: relative; z-index: 1; margin-bottom: 40px; }
-
-  .eyebrow {
-    font-size: 10px;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--dim);
-    margin-bottom: 10px;
-  }
-
-  h1 {
-    font-family: 'Orbitron', monospace;
-    font-size: clamp(24px, 4.5vw, 42px);
-    font-weight: 900;
-    line-height: 1.1;
-    color: var(--phosphor);
-    text-shadow: 0 0 20px rgba(0,255,106,0.4), 0 0 60px rgba(0,255,106,0.1);
-    margin-bottom: 10px;
-    letter-spacing: 0.05em;
-  }
-
-  .subtitle {
-    font-size: 11px;
-    color: var(--dim);
-    letter-spacing: 0.1em;
-  }
-
-  /* Readout bar — like an oscilloscope status bar */
-  .readout {
+  /* ── Title block ── */
+  .meta-strip {
     position: relative;
     z-index: 1;
     display: flex;
-    gap: 24px;
-    margin-bottom: 36px;
-    padding: 10px 16px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--surface);
-    font-size: 10px;
-    color: var(--dim);
-    letter-spacing: 0.1em;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 40px;
   }
 
-  .readout span { color: var(--phosphor); }
+  .meta-left { display: flex; flex-direction: column; gap: 4px; }
 
-  /* Section label */
-  .section-label {
+  .institution {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(32px, 6vw, 58px);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    line-height: 1.0;
+    color: var(--text);
+  }
+  h1 span { color: var(--blue); }
+
+  .meta-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    padding-top: 4px;
+  }
+
+  .meta-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+  .meta-tag span { color: var(--cyan); }
+
+  /* ── Info bar ── */
+  .info-bar {
     position: relative;
     z-index: 1;
+    display: flex;
+    margin-bottom: 36px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .info-cell {
+    flex: 1;
+    padding: 10px 16px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .info-cell:last-child { border-right: none; }
+
+  .info-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .info-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--cyan);
+  }
+
+  /* ── Section header ── */
+  .section-header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .section-header .label {
+    font-family: 'DM Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.3em;
     text-transform: uppercase;
-    color: var(--dim);
-    margin-bottom: 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .section-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
   }
 
-  /* File list */
-  .viz-list {
+  /* ── Module list ── */
+  .module-list {
     position: relative;
     z-index: 1;
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
 
-  .viz-item a {
+  .module-item a {
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 16px 20px;
+    border-radius: 6px;
+    padding: 18px 20px;
     text-decoration: none;
     color: var(--text);
-    transition: all 0.2s ease;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
     position: relative;
     overflow: hidden;
+    gap: 16px;
   }
 
-  /* Phosphor left bar */
-  .viz-item a::before {
+  .module-item a::before {
     content: '';
     position: absolute;
     left: 0; top: 0; bottom: 0;
-    width: 3px;
-    background: var(--item-color, var(--phosphor));
-    box-shadow: 0 0 8px var(--item-color, var(--phosphor));
+    width: 2px;
+    background: var(--item-color, var(--blue));
+    opacity: 0.7;
+    transition: opacity 0.2s;
   }
 
-  /* Hover glow sweep */
-  .viz-item a::after {
+  .module-item a::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, var(--phosphor-glow), transparent);
+    background: linear-gradient(90deg, rgba(74,158,255,0.05), transparent 60%);
     opacity: 0;
     transition: opacity 0.3s;
   }
 
-  .viz-item a:hover {
-    border-color: var(--phosphor-dim);
-    transform: translateX(6px);
+  .module-item a:hover {
+    border-color: var(--border-bright);
+    background: var(--surface2);
+    transform: translateX(4px);
+  }
+  .module-item a:hover::after { opacity: 1; }
+  .module-item a:hover::before { opacity: 1; }
+
+  .module-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    min-width: 0;
   }
 
-  .viz-item a:hover::after { opacity: 1; }
-
-  .viz-info { display: flex; flex-direction: column; gap: 4px; position: relative; z-index: 1; }
-
-  .viz-name {
-    font-family: 'Orbitron', monospace;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--phosphor);
-    letter-spacing: 0.05em;
+  .module-index {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 20px;
+    flex-shrink: 0;
   }
 
-  .viz-desc {
-    font-size: 10px;
-    color: var(--dim);
+  .module-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+  .module-name {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .viz-tag {
+  .module-desc {
+    font-size: 11px;
+    color: var(--text-mid);
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+  }
+
+  .module-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .module-tag {
+    font-family: 'DM Mono', monospace;
     font-size: 9px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     padding: 3px 8px;
-    border-radius: 2px;
+    border-radius: 3px;
     border: 1px solid var(--border);
-    color: var(--dim);
-    white-space: nowrap;
-    position: relative;
-    z-index: 1;
+    color: var(--text-dim);
+    background: var(--bg);
   }
 
-  .arrow {
-    color: var(--phosphor);
-    font-size: 14px;
-    margin-left: 12px;
-    position: relative;
-    z-index: 1;
-    text-shadow: 0 0 6px var(--phosphor);
+  .module-arrow {
+    font-size: 13px;
+    color: var(--blue);
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.2s;
   }
+  .module-item a:hover .module-arrow { opacity: 1; transform: translateX(3px); }
 
-  /* Footer */
+  /* ── Footer ── */
   .footer {
     position: relative;
     z-index: 1;
-    margin-top: 50px;
-    font-size: 9px;
-    color: var(--phosphor-dim);
-    letter-spacing: 0.15em;
-    border-top: 1px solid var(--border);
+    margin-top: 52px;
     padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
   }
 
-  /* Fade-in entries */
-  .viz-item {
-    animation: fadeIn 0.4s ease both;
+  /* ── Animations ── */
+  .scan-header, .meta-strip, .info-bar, .section-header {
+    animation: slideUp 0.5s ease both;
   }
-  .viz-item:nth-child(1) { animation-delay: 0.3s; }
-  .viz-item:nth-child(2) { animation-delay: 0.45s; }
-  .viz-item:nth-child(3) { animation-delay: 0.6s; }
-  .viz-item:nth-child(4) { animation-delay: 0.75s; }
-  .viz-item:nth-child(5) { animation-delay: 0.9s; }
+  .scan-header   { animation-delay: 0.0s; }
+  .meta-strip    { animation-delay: 0.05s; }
+  .info-bar      { animation-delay: 0.1s; }
+  .section-header{ animation-delay: 0.15s; }
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+  .module-item { animation: slideUp 0.4s ease both; }
+  .module-item:nth-child(1) { animation-delay: 0.2s; }
+  .module-item:nth-child(2) { animation-delay: 0.3s; }
+  .module-item:nth-child(3) { animation-delay: 0.4s; }
+  .module-item:nth-child(4) { animation-delay: 0.5s; }
+  .module-item:nth-child(5) { animation-delay: 0.6s; }
+  .module-item:nth-child(6) { animation-delay: 0.7s; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 </style>
 </head>
 <body>
 
-<!-- Animated sine wave header -->
-<div class="waveform-strip">
-  <svg viewBox="0 0 800 60" preserveAspectRatio="none">
-    <!-- Sine wave -->
-    <path class="wave-path" d="
-      M0,30
-      C20,30 30,5 50,5 S80,55 100,55 S130,5 150,5 S180,55 200,55
-      S230,5 250,5 S280,55 300,55 S330,5 350,5 S380,55 400,55
-      S430,5 450,5 S480,55 500,55 S530,5 550,5 S580,55 600,55
-      S630,5 650,5 S680,55 700,55 S730,5 750,5 S780,55 800,55
-    "/>
-    <!-- Impulse spike -->
-    <path class="wave-path" d="M400,55 L400,2 L402,2 L402,55" style="animation-delay:1.5s; stroke:#00ffaa;"/>
-  </svg>
+<div class="scan-header">
+  <canvas id="scanCanvas"></canvas>
 </div>
 
-<div class="header">
-  <div class="eyebrow">UIUC · BIOE 484 &nbsp;·&nbsp; Signals &amp; Systems</div>
-  <h1>Signal<br>References</h1>
-  <p class="subtitle">Interactive study references // Frank Tank</p>
+<div class="meta-strip">
+  <div class="meta-left">
+    <div class="institution">UIUC · BIOE 484 · Image Computing</div>
+    <h1>Statistical<br><span>Image Analysis</span></h1>
+  </div>
+  <div class="meta-right">
+    <div class="meta-tag">STUDENT <span>Frank Tank</span></div>
+    <div class="meta-tag">MODULES <span id="filecount">—</span></div>
+    <div class="meta-tag">TERM <span>Spring 2025</span></div>
+  </div>
 </div>
 
-<!-- Oscilloscope-style readout bar — EDIT values as you like -->
-<div class="readout">
-  CH1 <span>ON</span> &nbsp;|&nbsp;
-  TIMEBASE <span>1/f</span> &nbsp;|&nbsp;
-  TRIGGER <span>RISING</span> &nbsp;|&nbsp;
-  FILES <span id="filecount">0</span>
+<div class="info-bar">
+  <div class="info-cell">
+    <div class="info-label">Course</div>
+    <div class="info-value">BIOE 484</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-label">Topic</div>
+    <div class="info-value">Stat. Analysis</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-label">Format</div>
+    <div class="info-value">Interactive</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-label">Status</div>
+    <div class="info-value" style="color:var(--green)">Active</div>
+  </div>
 </div>
 
-<div class="section-label">References</div>
+<div class="section-header">
+  <span class="label">Study References</span>
+</div>
 
-<ul class="viz-list" id="filelist">
+<ul class="module-list" id="filelist">
 
-  <li class="viz-item" style="--item-color: #00ff6a">
+  <li class="module-item" style="--item-color: #a6e3a1">
     <a href="convolution_walkthrough.html">
-      <div class="viz-info">
-        <div class="viz-name">Convolution Walkthrough</div>
-        <div class="viz-desc">Step-by-step convolution of two signals · interactive</div>
+      <div class="module-left">
+        <span class="module-index">01</span>
+        <div class="module-info">
+          <div class="module-name">Convolution Walkthrough</div>
+          <div class="module-desc">step-by-step convolution of two signals · interactive</div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="viz-tag">Convolution</span>
-        <span class="arrow">→</span>
+      <div class="module-right">
+        <span class="module-tag">Convolution</span>
+        <span class="module-arrow">→</span>
       </div>
     </a>
   </li>
-  <li class="viz-item" style="--item-color: #00e5ff">
+
+  <li class="module-item" style="--item-color: #4a9eff">
     <a href="fourier-walkthrough.html">
-      <div class="viz-info">
-        <div class="viz-name">Fourier Walkthrough</div>
-        <div class="viz-desc">Frequency domain decomposition · animated</div>
+      <div class="module-left">
+        <span class="module-index">02</span>
+        <div class="module-info">
+          <div class="module-name">Fourier Walkthrough</div>
+          <div class="module-desc">frequency domain decomposition · animated</div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="viz-tag">Fourier</span>
-        <span class="arrow">→</span>
+      <div class="module-right">
+        <span class="module-tag">Fourier</span>
+        <span class="module-arrow">→</span>
       </div>
     </a>
   </li>
-  <li class="viz-item" style="--item-color: #ffd700">
+
+  <li class="module-item" style="--item-color: #f9e2af">
     <a href="image_sampling.html">
-      <div class="viz-info">
-        <div class="viz-name">Image Sampling</div>
-        <div class="viz-desc">Spatial sampling and aliasing in 2D images · interactive</div>
+      <div class="module-left">
+        <span class="module-index">03</span>
+        <div class="module-info">
+          <div class="module-name">Image Sampling</div>
+          <div class="module-desc">spatial sampling and aliasing in 2D images · interactive</div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="viz-tag">Sampling</span>
-        <span class="arrow">→</span>
+      <div class="module-right">
+        <span class="module-tag">Sampling</span>
+        <span class="module-arrow">→</span>
       </div>
     </a>
   </li>
-  <li class="viz-item" style="--item-color: #ff6b35">
+
+  <li class="module-item" style="--item-color: #cba6f7">
     <a href="sampling_theory_interactive.html">
-      <div class="viz-info">
-        <div class="viz-name">Sampling Theory</div>
-        <div class="viz-desc">Nyquist theorem and reconstruction · interactive</div>
+      <div class="module-left">
+        <span class="module-index">04</span>
+        <div class="module-info">
+          <div class="module-name">Sampling Theory</div>
+          <div class="module-desc">Nyquist theorem and reconstruction · interactive</div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="viz-tag">Nyquist</span>
-        <span class="arrow">→</span>
+      <div class="module-right">
+        <span class="module-tag">Nyquist</span>
+        <span class="module-arrow">→</span>
+      </div>
+    </a>
+  </li>
+
+  <li class="module-item" style="--item-color: #7de8f5">
+    <a href="gaussian_filtering_viz.html">
+      <div class="module-left">
+        <span class="module-index">05</span>
+        <div class="module-info">
+          <div class="module-name">Gaussian Filtering</div>
+          <div class="module-desc">Gaussian smoothing, DoG &amp; LoG kernels · interactive</div>
+        </div>
+      </div>
+      <div class="module-right">
+        <span class="module-tag">Filtering</span>
+        <span class="module-arrow">→</span>
       </div>
     </a>
   </li>
@@ -356,13 +473,128 @@
 
 </ul>
 
-<!-- EDIT: Footer credit -->
-<div class="footer">// Your name &nbsp;·&nbsp; Generated with Claude &nbsp;·&nbsp; GitHub Pages</div>
+<div class="footer">
+  <div class="footer-text">// Frank Tank · Generated with Claude · GitHub Pages</div>
+  <div class="footer-text" id="timestamp"></div>
+</div>
 
 <script>
-  // Auto-updates the file count readout
   document.getElementById('filecount').textContent =
-    document.getElementById('filelist').querySelectorAll('.viz-item').length;
+    document.getElementById('filelist').querySelectorAll('.module-item').length;
+
+  document.getElementById('timestamp').textContent =
+    new Date().toISOString().slice(0,10);
+
+  // ── Animated scan-strip header ──
+  // Renders a pseudo tissue intensity profile with a moving scan cursor
+  const canvas = document.getElementById('scanCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width  = canvas.offsetWidth  * window.devicePixelRatio;
+    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const W = () => canvas.offsetWidth;
+  const H = () => canvas.offsetHeight;
+
+  // Sum of Gaussians — simulates a tissue cross-section intensity profile
+  function tissueProfile(x, w) {
+    const t = x / w;
+    const peaks = [
+      {c:0.10, a:0.50, s:0.055},
+      {c:0.25, a:0.32, s:0.038},
+      {c:0.40, a:0.78, s:0.085},
+      {c:0.54, a:0.42, s:0.048},
+      {c:0.67, a:0.68, s:0.065},
+      {c:0.80, a:0.28, s:0.040},
+      {c:0.91, a:0.52, s:0.058},
+    ];
+    return peaks.reduce((sum, p) => {
+      const d = t - p.c;
+      return sum + p.a * Math.exp(-(d*d) / (2*p.s*p.s));
+    }, 0.05);
+  }
+
+  let scanX = 0;
+
+  function draw() {
+    const w = W(), h = H();
+    const dpr = window.devicePixelRatio;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    // Dark background
+    ctx.fillStyle = '#0c0e18';
+    ctx.fillRect(0, 0, w, h);
+
+    // Build profile
+    const profile = Array.from({length: w}, (_, x) => tissueProfile(x, w));
+
+    // Filled area under curve
+    const areaGrad = ctx.createLinearGradient(0, 0, 0, h);
+    areaGrad.addColorStop(0,   'rgba(74,158,255,0.0)');
+    areaGrad.addColorStop(0.35,'rgba(74,158,255,0.16)');
+    areaGrad.addColorStop(1,   'rgba(74,158,255,0.03)');
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let x = 0; x < w; x++) {
+      ctx.lineTo(x, h - profile[x] * h * 0.78);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = areaGrad;
+    ctx.fill();
+
+    // Profile line
+    ctx.beginPath();
+    for (let x = 0; x < w; x++) {
+      const y = h - profile[x] * h * 0.78;
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(74,158,255,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Ruler ticks along bottom edge
+    ctx.strokeStyle = 'rgba(74,158,255,0.18)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 28) {
+      const tickH = (x % 140 === 0) ? 9 : 5;
+      ctx.beginPath();
+      ctx.moveTo(x, h);
+      ctx.lineTo(x, h - tickH);
+      ctx.stroke();
+    }
+
+    // Scan cursor glow
+    scanX = (scanX + 0.7) % (w + 60);
+    const cx = scanX - 30;
+    const scanGrad = ctx.createLinearGradient(cx - 24, 0, cx + 24, 0);
+    scanGrad.addColorStop(0,   'rgba(125,232,245,0)');
+    scanGrad.addColorStop(0.5, 'rgba(125,232,245,0.55)');
+    scanGrad.addColorStop(1,   'rgba(125,232,245,0)');
+    ctx.fillStyle = scanGrad;
+    ctx.fillRect(cx - 24, 0, 48, h);
+
+    // Cursor line
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, h);
+    ctx.strokeStyle = 'rgba(125,232,245,0.75)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.restore();
+    requestAnimationFrame(draw);
+  }
+
+  draw();
 </script>
 
 </body>
