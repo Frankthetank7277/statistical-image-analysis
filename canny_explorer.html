@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canny Edge Detector — Interactive Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060a0f;
+    --surface: #0c1219;
+    --panel: #101820;
+    --border: #1a2a38;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #39ff14;
+    --dim: #4a6070;
+    --text: #c8dde8;
+    --label: #5a8090;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,229,255,0.012) 3px, rgba(0,229,255,0.012) 4px);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    padding: 20px 32px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #e8f4f8;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  .subtitle {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    margin-left: auto;
+    letter-spacing: 1px;
+  }
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: auto 1fr;
+    height: calc(100vh - 65px);
+  }
+
+  /* ---- PIPELINE STAGES ---- */
+  .stages {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    gap: 0;
+    padding: 16px 20px 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stage-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-bottom: none;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--dim);
+    border-radius: 4px 4px 0 0;
+    transition: all 0.2s;
+    position: relative;
+    bottom: -1px;
+  }
+
+  .stage-tab .num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    background: var(--border);
+    border-radius: 2px;
+    padding: 1px 5px;
+    color: var(--dim);
+    transition: all 0.2s;
+  }
+
+  .stage-tab:hover { color: var(--text); }
+  .stage-tab:hover .num { background: rgba(0,229,255,0.15); color: var(--accent); }
+
+  .stage-tab.active {
+    color: var(--accent);
+    border-color: var(--border);
+    border-bottom-color: var(--bg);
+    background: var(--bg);
+  }
+
+  .stage-tab.active .num {
+    background: rgba(0,229,255,0.2);
+    color: var(--accent);
+  }
+
+  .arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    color: var(--border);
+    font-size: 18px;
+    align-self: center;
+    padding-bottom: 4px;
+  }
+
+  /* ---- CANVAS AREA ---- */
+  .canvas-area {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 12px;
+    background: var(--bg);
+    position: relative;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    display: inline-block;
+  }
+
+  .canvas-corner {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.5;
+  }
+  .canvas-corner.tl { top: -4px; left: -4px; border-width: 2px 0 0 2px; }
+  .canvas-corner.tr { top: -4px; right: -4px; border-width: 2px 2px 0 0; }
+  .canvas-corner.bl { bottom: -4px; left: -4px; border-width: 0 0 2px 2px; }
+  .canvas-corner.br { bottom: -4px; right: -4px; border-width: 0 2px 2px 0; }
+
+  canvas {
+    display: block;
+    cursor: crosshair;
+    border: 1px solid var(--border);
+  }
+
+  .canvas-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .canvas-tools {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    border-radius: 2px;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+
+  .btn.active {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(255,107,53,0.08);
+  }
+
+  .tool-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+
+  /* ---- SIDEBAR ---- */
+  .sidebar {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .sidebar-section h3 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .control-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .control-name {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: var(--text);
+  }
+
+  .control-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 32px;
+    text-align: right;
+  }
+
+  .control-hint {
+    font-size: 11px;
+    color: var(--label);
+    line-height: 1.4;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0,229,255,0.5);
+    transition: box-shadow 0.15s;
+  }
+
+  input[type=range]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 14px rgba(0,229,255,0.8);
+  }
+
+  /* Stage-specific accent colors */
+  .stage-2 input[type=range]::-webkit-slider-thumb { background: #a78bfa; box-shadow: 0 0 8px rgba(167,139,250,0.5); }
+  .stage-3 input[type=range]::-webkit-slider-thumb { background: var(--accent2); box-shadow: 0 0 8px rgba(255,107,53,0.5); }
+  .stage-4 input[type=range]::-webkit-slider-thumb { background: var(--accent3); box-shadow: 0 0 8px rgba(57,255,20,0.5); }
+
+  .stage-2 .control-val { color: #a78bfa; }
+  .stage-3 .control-val { color: var(--accent2); }
+  .stage-4 .control-val { color: var(--accent3); }
+
+  /* ---- HISTOGRAM ---- */
+  .hist-wrap {
+    position: relative;
+    height: 60px;
+    background: #080e14;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  #histCanvas { display: block; }
+
+  .threshold-line {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    cursor: ew-resize;
+    z-index: 5;
+  }
+
+  #tLowLine { background: rgba(255,107,53,0.8); left: 30%; }
+  #tHighLine { background: rgba(57,255,20,0.8); left: 70%; }
+
+  .threshold-label {
+    position: absolute;
+    top: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    padding: 1px 3px;
+    border-radius: 2px;
+  }
+
+  .tl-label { color: var(--accent2); top: 2px; }
+  .th-label { color: var(--accent3); top: 14px; }
+
+  /* ---- INFO BOX ---- */
+  .info-box {
+    background: rgba(0,229,255,0.03);
+    border: 1px solid rgba(0,229,255,0.1);
+    border-radius: 3px;
+    padding: 10px 12px;
+  }
+
+  .info-box p {
+    font-size: 12px;
+    color: var(--label);
+    line-height: 1.6;
+  }
+
+  .info-box strong { color: var(--text); }
+
+  /* ---- STATS ---- */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-card {
+    background: #080e14;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+  }
+
+  .stat-card .sv {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-card .sl {
+    font-size: 10px;
+    color: var(--label);
+    letter-spacing: 1px;
+    margin-top: 3px;
+  }
+
+  /* Loading indicator */
+  .processing {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .processing.show { opacity: 1; animation: blink 0.7s infinite; }
+
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* Preset buttons */
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .preset-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    letter-spacing: 1px;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">// SIGNAL-LAB</span>
+  <h1><span>Canny</span> Edge Detector</h1>
+  <span class="subtitle">Interactive Pipeline Explorer · v1.0</span>
+</header>
+
+<div class="main-layout">
+
+  <!-- Stage Tabs -->
+  <div class="stages">
+    <div class="stage-tab active" data-stage="0"><span class="num">0</span> Input</div>
+    <div class="arrow">›</div>
+    <div class="stage-tab" data-stage="1"><span class="num">1</span> Grayscale</div>
+    <div class="arrow">›</div>
+    <div class="stage-tab stage-2" data-stage="2"><span class="num">2</span> Gaussian Blur</div>
+    <div class="arrow">›</div>
+    <div class="stage-tab stage-3" data-stage="3"><span class="num">3</span> Gradient</div>
+    <div class="arrow">›</div>
+    <div class="stage-tab stage-3" data-stage="4"><span class="num">4</span> NMS</div>
+    <div class="arrow">›</div>
+    <div class="stage-tab stage-4" data-stage="5"><span class="num">5</span> Hysteresis</div>
+  </div>
+
+  <!-- Canvas Area -->
+  <div class="canvas-area">
+    <div class="processing" id="procIndicator">PROCESSING...</div>
+
+    <div class="canvas-wrap">
+      <div class="canvas-corner tl"></div>
+      <div class="canvas-corner tr"></div>
+      <div class="canvas-corner bl"></div>
+      <div class="canvas-corner br"></div>
+      <canvas id="displayCanvas" width="560" height="420"></canvas>
+    </div>
+
+    <div class="canvas-label" id="stageLabel">STAGE 0 — INPUT IMAGE</div>
+
+    <div class="canvas-tools">
+      <button class="btn active" id="btnDraw">✏ DRAW</button>
+      <button class="btn" id="btnErase">◻ ERASE</button>
+      <div class="tool-sep"></div>
+      <button class="btn" id="btnShapes">LOAD SHAPES</button>
+      <button class="btn" id="btnPhoto">LOAD PHOTO</button>
+      <button class="btn" id="btnClear">CLEAR</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Stage Info -->
+    <div class="sidebar-section" id="stageInfo">
+      <h3>Stage Info</h3>
+      <div class="info-box" id="stageDesc">
+        <p id="stageDescText">Draw on the canvas or load a test image. Navigate the pipeline stages above to see each transformation step.</p>
+      </div>
+    </div>
+
+    <!-- Gaussian Controls -->
+    <div class="sidebar-section stage-2" id="gaussSection">
+      <h3>Gaussian Blur</h3>
+      <div class="control-row">
+        <div class="control-header">
+          <span class="control-name">σ (Sigma)</span>
+          <span class="control-val" id="sigmaVal">1.4</span>
+        </div>
+        <input type="range" id="sigmaSlider" min="0.5" max="5" step="0.1" value="1.4">
+        <span class="control-hint">Controls blur radius. Higher σ = more smoothing, fewer false edges, but loses fine detail.</span>
+      </div>
+      <div class="control-row">
+        <div class="control-header">
+          <span class="control-name">Kernel Size</span>
+          <span class="control-val" id="kernelVal">5×5</span>
+        </div>
+        <input type="range" id="kernelSlider" min="3" max="11" step="2" value="5">
+        <span class="control-hint">Kernel must be odd-sized and large enough to capture σ (rule: ≥ 6σ+1).</span>
+      </div>
+    </div>
+
+    <!-- Threshold Controls -->
+    <div class="sidebar-section stage-4" id="threshSection">
+      <h3>Hysteresis Thresholds</h3>
+
+      <div class="hist-wrap">
+        <canvas id="histCanvas" width="240" height="60"></canvas>
+        <div class="threshold-line" id="tLowLine">
+          <span class="threshold-label tl-label" id="tLowLabel">T_LO</span>
+        </div>
+        <div class="threshold-line" id="tHighLine">
+          <span class="threshold-label th-label" id="tHighLabel">T_HI</span>
+        </div>
+      </div>
+
+      <div class="control-row" style="margin-top:12px">
+        <div class="control-header">
+          <span class="control-name" style="color:var(--accent2)">Low Threshold</span>
+          <span class="control-val" style="color:var(--accent2)" id="tLowVal">30</span>
+        </div>
+        <input type="range" id="tLowSlider" min="1" max="200" step="1" value="30"
+          style="--thumb-color:var(--accent2)">
+        <span class="control-hint">Weak edges below this are discarded.</span>
+      </div>
+
+      <div class="control-row">
+        <div class="control-header">
+          <span class="control-name" style="color:var(--accent3)">High Threshold</span>
+          <span class="control-val" style="color:var(--accent3)" id="tHighVal">90</span>
+        </div>
+        <input type="range" id="tHighSlider" min="1" max="255" step="1" value="90">
+        <span class="control-hint">Strong edges above this are always kept. Connected weak edges survive.</span>
+      </div>
+
+      <div style="margin-top:6px">
+        <div class="control-header" style="margin-bottom:8px">
+          <span class="control-name">Ratio T_HI / T_LO</span>
+          <span class="control-val" id="ratioVal">3.0×</span>
+        </div>
+        <span class="control-hint">Canny recommended ratio of 2:1 to 3:1 for most images.</span>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="sidebar-section">
+      <h3>Presets</h3>
+      <div class="presets">
+        <button class="preset-btn" data-preset="fine">Fine Detail</button>
+        <button class="preset-btn" data-preset="strong">Strong Edges</button>
+        <button class="preset-btn" data-preset="clean">Clean</button>
+        <button class="preset-btn" data-preset="soft">Soft / Noisy</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="sidebar-section">
+      <h3>Statistics</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="sv" id="statEdgePct">--%</div>
+          <div class="sl">EDGE PIXELS</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv" id="statStrong">--</div>
+          <div class="sl">STRONG EDGES</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv" id="statWeak">--</div>
+          <div class="sl">WEAK EDGES</div>
+        </div>
+        <div class="stat-card">
+          <div class="sv" id="statRatio">--</div>
+          <div class="sl">S/W RATIO</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Hidden source canvas -->
+<canvas id="srcCanvas" width="560" height="420" style="display:none"></canvas>
+
+<script>
+// ===================== STATE =====================
+const state = {
+  currentStage: 0,
+  sigma: 1.4,
+  kernelSize: 5,
+  tLow: 30,
+  tHigh: 90,
+  drawing: false,
+  erasing: false,
+  drawMode: 'draw',
+  lastX: 0,
+  lastY: 0,
+  needsUpdate: true,
+};
+
+const stageInfo = [
+  { label: 'STAGE 0 — INPUT IMAGE', desc: 'The original input image. Draw freely or load a test pattern. The Canny detector works on any 2D image.' },
+  { label: 'STAGE 1 — GRAYSCALE', desc: 'Convert to luminance using the perceptual formula: <strong>L = 0.299R + 0.587G + 0.114B</strong>. This weighs green more heavily, matching human visual sensitivity.' },
+  { label: 'STAGE 2 — GAUSSIAN BLUR', desc: 'Apply a Gaussian kernel to suppress noise. The blur is separable (H×V passes). <strong>σ controls the scale of features detected</strong> — higher σ detects coarser edges.' },
+  { label: 'STAGE 3 — GRADIENT MAGNITUDE', desc: 'Compute image gradients using Sobel operators. <strong>|G| = √(Gx² + Gy²)</strong>. Bright pixels = strong intensity change. Gradient direction is also stored for NMS.' },
+  { label: 'STAGE 4 — NON-MAX SUPPRESSION', desc: 'Thin edges to single-pixel width. Each pixel is compared to its neighbours in the gradient direction — only local maxima survive. <strong>Eliminates blurry edges.</strong>' },
+  { label: 'STAGE 5 — HYSTERESIS THRESHOLDING', desc: '<strong>Strong edges</strong> (above T_HI) are kept. <strong>Weak edges</strong> (T_LO–T_HI) survive only if connected to strong edges. Below T_LO: discarded. This reduces broken or noisy edges.' },
+];
+
+// ===================== CANVAS SETUP =====================
+const displayCanvas = document.getElementById('displayCanvas');
+const dCtx = displayCanvas.getContext('2d', { willReadFrequently: true });
+const srcCanvas = document.getElementById('srcCanvas');
+const sCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+const W = displayCanvas.width;
+const H = displayCanvas.height;
+
+// ===================== DRAWING =====================
+let drawing = false;
+
+displayCanvas.addEventListener('mousedown', e => {
+  if (state.currentStage !== 0) return;
+  drawing = true;
+  const [x, y] = getPos(e);
+  state.lastX = x; state.lastY = y;
+  sCtx.beginPath();
+  sCtx.arc(x, y, state.drawMode === 'draw' ? 4 : 16, 0, Math.PI * 2);
+  sCtx.fillStyle = state.drawMode === 'draw' ? '#ffffff' : '#000000';
+  sCtx.fill();
+  render();
+});
+
+displayCanvas.addEventListener('mousemove', e => {
+  if (!drawing || state.currentStage !== 0) return;
+  const [x, y] = getPos(e);
+  sCtx.beginPath();
+  sCtx.moveTo(state.lastX, state.lastY);
+  sCtx.lineTo(x, y);
+  sCtx.strokeStyle = state.drawMode === 'draw' ? '#ffffff' : '#000000';
+  sCtx.lineWidth = state.drawMode === 'draw' ? 8 : 32;
+  sCtx.lineCap = 'round';
+  sCtx.stroke();
+  state.lastX = x; state.lastY = y;
+  render();
+});
+
+displayCanvas.addEventListener('mouseup', () => { drawing = false; });
+displayCanvas.addEventListener('mouseleave', () => { drawing = false; });
+
+function getPos(e) {
+  const r = displayCanvas.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+}
+
+// ===================== IMAGE PROCESSING =====================
+function getPixels(canvas) {
+  return canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H);
+}
+
+function gaussKernel(sigma, size) {
+  const k = [];
+  const half = Math.floor(size / 2);
+  let sum = 0;
+  for (let y = -half; y <= half; y++) {
+    for (let x = -half; x <= half; x++) {
+      const v = Math.exp(-(x*x + y*y) / (2*sigma*sigma));
+      k.push(v);
+      sum += v;
+    }
+  }
+  return k.map(v => v / sum);
+}
+
+function toGrayscale(imgData) {
+  const src = imgData.data;
+  const out = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    out[i] = 0.299*src[i*4] + 0.587*src[i*4+1] + 0.114*src[i*4+2];
+  }
+  return out;
+}
+
+function applyGaussian(gray, sigma, ksize) {
+  const k = gaussKernel(sigma, ksize);
+  const half = Math.floor(ksize / 2);
+  const tmp = new Float32Array(W * H);
+  const out = new Float32Array(W * H);
+
+  // Horizontal
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let sum = 0, wsum = 0;
+      for (let kx = -half; kx <= half; kx++) {
+        const nx = Math.max(0, Math.min(W-1, x+kx));
+        const kv = k[(kx+half) * ksize + half]; // use 1D approx
+        // Actually use separable 1D kernel
+        const kg = Math.exp(-(kx*kx)/(2*sigma*sigma));
+        sum += gray[y*W + nx] * kg;
+        wsum += kg;
+      }
+      tmp[y*W + x] = sum / wsum;
+    }
+  }
+  // Vertical
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let sum = 0, wsum = 0;
+      for (let ky = -half; ky <= half; ky++) {
+        const ny = Math.max(0, Math.min(H-1, y+ky));
+        const kg = Math.exp(-(ky*ky)/(2*sigma*sigma));
+        sum += tmp[ny*W + x] * kg;
+        wsum += kg;
+      }
+      out[y*W + x] = sum / wsum;
+    }
+  }
+  return out;
+}
+
+function sobelGradient(gray) {
+  const mag = new Float32Array(W * H);
+  const dir = new Float32Array(W * H);
+  const Kx = [-1,0,1,-2,0,2,-1,0,1];
+  const Ky = [-1,-2,-1,0,0,0,1,2,1];
+
+  for (let y = 1; y < H-1; y++) {
+    for (let x = 1; x < W-1; x++) {
+      let gx = 0, gy = 0;
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const v = gray[(y+ky)*W + (x+kx)];
+          const ki = (ky+1)*3 + (kx+1);
+          gx += v * Kx[ki];
+          gy += v * Ky[ki];
+        }
+      }
+      mag[y*W+x] = Math.sqrt(gx*gx + gy*gy);
+      dir[y*W+x] = Math.atan2(gy, gx);
+    }
+  }
+  return { mag, dir };
+}
+
+function nonMaxSuppression(mag, dir) {
+  const out = new Float32Array(W * H);
+  for (let y = 1; y < H-1; y++) {
+    for (let x = 1; x < W-1; x++) {
+      const idx = y*W+x;
+      const angle = (dir[idx] * 180 / Math.PI + 180) % 180;
+      let q, r;
+      if ((angle < 22.5) || (angle >= 157.5)) {
+        q = mag[y*W+(x+1)]; r = mag[y*W+(x-1)];
+      } else if (angle < 67.5) {
+        q = mag[(y+1)*W+(x-1)]; r = mag[(y-1)*W+(x+1)];
+      } else if (angle < 112.5) {
+        q = mag[(y+1)*W+x]; r = mag[(y-1)*W+x];
+      } else {
+        q = mag[(y-1)*W+(x-1)]; r = mag[(y+1)*W+(x+1)];
+      }
+      out[idx] = (mag[idx] >= q && mag[idx] >= r) ? mag[idx] : 0;
+    }
+  }
+  return out;
+}
+
+function hysteresis(nms, tLow, tHigh) {
+  const STRONG = 255, WEAK = 75, NONE = 0;
+  const edge = new Uint8Array(W * H);
+
+  for (let i = 0; i < W * H; i++) {
+    if (nms[i] >= tHigh) edge[i] = STRONG;
+    else if (nms[i] >= tLow) edge[i] = WEAK;
+    else edge[i] = NONE;
+  }
+
+  // Connectivity pass
+  for (let y = 1; y < H-1; y++) {
+    for (let x = 1; x < W-1; x++) {
+      if (edge[y*W+x] === WEAK) {
+        let connected = false;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (edge[(y+dy)*W+(x+dx)] === STRONG) { connected = true; break; }
+          }
+          if (connected) break;
+        }
+        edge[y*W+x] = connected ? STRONG : NONE;
+      }
+    }
+  }
+
+  return edge;
+}
+
+// ===================== PIPELINE =====================
+let pipeline = {};
+
+function runPipeline() {
+  const imgData = sCtx.getImageData(0, 0, W, H);
+  pipeline.gray = toGrayscale(imgData);
+  pipeline.blurred = applyGaussian(pipeline.gray, state.sigma, state.kernelSize);
+  const grad = sobelGradient(pipeline.blurred);
+  pipeline.mag = grad.mag;
+  pipeline.dir = grad.dir;
+  pipeline.nms = nonMaxSuppression(pipeline.mag, pipeline.dir);
+  pipeline.edges = hysteresis(pipeline.nms, state.tLow, state.tHigh);
+  updateHistogram();
+  updateStats();
+}
+
+// ===================== RENDERING =====================
+function render() {
+  const proc = document.getElementById('procIndicator');
+  proc.classList.add('show');
+  setTimeout(() => {
+    runPipeline();
+    renderStage(state.currentStage);
+    proc.classList.remove('show');
+  }, 10);
+}
+
+function renderStage(stage) {
+  const imgData = dCtx.createImageData(W, H);
+  const d = imgData.data;
+
+  if (stage === 0) {
+    const src = sCtx.getImageData(0, 0, W, H).data;
+    for (let i = 0; i < W*H*4; i++) d[i] = src[i];
+  } else if (stage === 1) {
+    for (let i = 0; i < W*H; i++) {
+      const v = pipeline.gray[i];
+      d[i*4]=v; d[i*4+1]=v; d[i*4+2]=v; d[i*4+3]=255;
+    }
+  } else if (stage === 2) {
+    for (let i = 0; i < W*H; i++) {
+      const v = pipeline.blurred[i];
+      d[i*4]=v; d[i*4+1]=v; d[i*4+2]=v; d[i*4+3]=255;
+    }
+  } else if (stage === 3) {
+    // Gradient with color mapping (hue = direction, brightness = magnitude)
+    const maxMag = Math.max(...pipeline.mag) || 1;
+    for (let i = 0; i < W*H; i++) {
+      const m = pipeline.mag[i] / maxMag;
+      const angle = (pipeline.dir[i] + Math.PI) / (2*Math.PI);
+      const [r,g,b] = hsl2rgb(angle, 0.8, m * 0.6);
+      d[i*4]=r; d[i*4+1]=g; d[i*4+2]=b; d[i*4+3]=255;
+    }
+  } else if (stage === 4) {
+    const maxMag = Math.max(...pipeline.nms) || 1;
+    for (let i = 0; i < W*H; i++) {
+      const v = Math.min(255, (pipeline.nms[i] / maxMag) * 255);
+      // Orange-white color ramp
+      d[i*4] = Math.min(255, v * 1.5);
+      d[i*4+1] = v * 0.5;
+      d[i*4+2] = 0;
+      d[i*4+3] = 255;
+    }
+  } else if (stage === 5) {
+    for (let i = 0; i < W*H; i++) {
+      const v = pipeline.edges[i];
+      d[i*4] = v === 255 ? 57 : 0;
+      d[i*4+1] = v === 255 ? 255 : 0;
+      d[i*4+2] = v === 255 ? 20 : 0;
+      d[i*4+3] = 255;
+    }
+  }
+
+  dCtx.putImageData(imgData, 0, 0);
+
+  // Grid overlay for stage 0
+  if (stage === 0) {
+    dCtx.strokeStyle = 'rgba(0,229,255,0.04)';
+    dCtx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { dCtx.beginPath(); dCtx.moveTo(x,0); dCtx.lineTo(x,H); dCtx.stroke(); }
+    for (let y = 0; y < H; y += 40) { dCtx.beginPath(); dCtx.moveTo(0,y); dCtx.lineTo(W,y); dCtx.stroke(); }
+  }
+
+  document.getElementById('stageLabel').textContent = stageInfo[stage].label;
+  document.getElementById('stageDescText').innerHTML = stageInfo[stage].desc;
+}
+
+function hsl2rgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const q = l < 0.5 ? l*(1+s) : l+s-l*s;
+    const p = 2*l-q;
+    r = hue2rgb(p,q,h+1/3); g = hue2rgb(p,q,h); b = hue2rgb(p,q,h-1/3);
+  }
+  return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+}
+function hue2rgb(p,q,t) {
+  if(t<0)t+=1; if(t>1)t-=1;
+  if(t<1/6) return p+(q-p)*6*t;
+  if(t<1/2) return q;
+  if(t<2/3) return p+(q-p)*(2/3-t)*6;
+  return p;
+}
+
+// ===================== HISTOGRAM =====================
+function updateHistogram() {
+  const hCanvas = document.getElementById('histCanvas');
+  const hCtx = hCanvas.getContext('2d');
+  const hist = new Array(256).fill(0);
+  const maxM = Math.max(...pipeline.nms) || 1;
+
+  for (let i = 0; i < W*H; i++) {
+    const v = Math.floor((pipeline.nms[i] / maxM) * 255);
+    if (v > 0) hist[v]++;
+  }
+
+  const maxH = Math.max(...hist) || 1;
+  hCtx.clearRect(0, 0, 240, 60);
+  hCtx.fillStyle = '#080e14';
+  hCtx.fillRect(0, 0, 240, 60);
+
+  for (let i = 0; i < 256; i++) {
+    const bh = (hist[i] / maxH) * 58;
+    const x = (i / 255) * 240;
+    hCtx.fillStyle = i < state.tLow ? 'rgba(80,100,120,0.6)' : i < state.tHigh ? 'rgba(255,107,53,0.7)' : 'rgba(57,255,20,0.8)';
+    hCtx.fillRect(x, 60-bh, 1, bh);
+  }
+
+  // Update threshold lines
+  const loPct = (state.tLow / 255) * 100;
+  const hiPct = (state.tHigh / 255) * 100;
+  document.getElementById('tLowLine').style.left = loPct + '%';
+  document.getElementById('tHighLine').style.left = hiPct + '%';
+  document.getElementById('tLowLabel').textContent = state.tLow;
+  document.getElementById('tHighLabel').textContent = state.tHigh;
+  document.getElementById('ratioVal').textContent = (state.tHigh/Math.max(1,state.tLow)).toFixed(1) + '×';
+}
+
+// ===================== STATS =====================
+function updateStats() {
+  const edges = pipeline.edges;
+  let strong = 0, weak = 0;
+  for (let i = 0; i < edges.length; i++) {
+    if (edges[i] === 255) strong++;
+    else if (edges[i] === 75) weak++;
+  }
+  const total = W * H;
+  const pct = ((strong / total) * 100).toFixed(1);
+  document.getElementById('statEdgePct').textContent = pct + '%';
+  document.getElementById('statStrong').textContent = strong > 999 ? (strong/1000).toFixed(1)+'k' : strong;
+  document.getElementById('statWeak').textContent = weak > 999 ? (weak/1000).toFixed(1)+'k' : weak;
+  document.getElementById('statRatio').textContent = weak > 0 ? (strong/weak).toFixed(2) : '∞';
+}
+
+// ===================== LOAD SHAPES =====================
+function loadShapes() {
+  sCtx.fillStyle = '#000';
+  sCtx.fillRect(0, 0, W, H);
+  sCtx.strokeStyle = '#fff';
+  sCtx.lineWidth = 3;
+
+  // Circle
+  sCtx.beginPath(); sCtx.arc(140, 120, 70, 0, Math.PI*2); sCtx.stroke();
+  // Rectangle
+  sCtx.strokeRect(280, 60, 200, 120);
+  // Triangle
+  sCtx.beginPath(); sCtx.moveTo(80, 320); sCtx.lineTo(200, 200); sCtx.lineTo(320, 320); sCtx.closePath(); sCtx.stroke();
+  // Star
+  drawStar(sCtx, 430, 280, 5, 80, 35);
+  sCtx.stroke();
+  // Diagonal lines
+  sCtx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    sCtx.beginPath(); sCtx.moveTo(340+i*18, 200); sCtx.lineTo(380+i*18, 330); sCtx.stroke();
+  }
+  render();
+}
+
+function drawStar(ctx, cx, cy, spikes, outerR, innerR) {
+  let rot = Math.PI/2*3;
+  const step = Math.PI/spikes;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy-outerR);
+  for (let i = 0; i < spikes; i++) {
+    ctx.lineTo(cx + Math.cos(rot)*outerR, cy + Math.sin(rot)*outerR);
+    rot += step;
+    ctx.lineTo(cx + Math.cos(rot)*innerR, cy + Math.sin(rot)*innerR);
+    rot += step;
+  }
+  ctx.closePath();
+}
+
+// ===================== LOAD PHOTO =====================
+function loadPhoto() {
+  // Procedural "photo-like" scene with gradients and texture
+  sCtx.fillStyle = '#000';
+  sCtx.fillRect(0, 0, W, H);
+
+  // Sky gradient
+  const sky = sCtx.createLinearGradient(0, 0, 0, 200);
+  sky.addColorStop(0, '#111');
+  sky.addColorStop(1, '#333');
+  sCtx.fillStyle = sky;
+  sCtx.fillRect(0, 0, W, 200);
+
+  // Buildings
+  const buildings = [[50,100,80,300],[150,60,70,340],[240,120,90,280],[350,40,60,360],[430,90,80,310],[510,130,50,270]];
+  buildings.forEach(([x,y,w,h]) => {
+    const shade = 40 + Math.random()*60;
+    sCtx.fillStyle = `rgb(${shade},${shade},${shade})`;
+    sCtx.fillRect(x, H-h, w, h);
+    // windows
+    for (let wy = H-h+10; wy < H-20; wy += 25) {
+      for (let wx = x+8; wx < x+w-8; wx += 18) {
+        if (Math.random() > 0.4) {
+          sCtx.fillStyle = `rgba(255,255,180,${0.3+Math.random()*0.7})`;
+          sCtx.fillRect(wx, wy, 10, 14);
+        }
+      }
+    }
+  });
+
+  // Ground
+  const ground = sCtx.createLinearGradient(0, H-100, 0, H);
+  ground.addColorStop(0, '#555'); ground.addColorStop(1, '#222');
+  sCtx.fillStyle = ground;
+  sCtx.fillRect(0, H-100, W, 100);
+
+  // Moon
+  sCtx.beginPath(); sCtx.arc(480, 60, 35, 0, Math.PI*2);
+  sCtx.fillStyle = '#ddd'; sCtx.fill();
+
+  render();
+}
+
+// ===================== CONTROLS =====================
+document.querySelectorAll('.stage-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.stage-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    state.currentStage = parseInt(tab.dataset.stage);
+    renderStage(state.currentStage);
+  });
+});
+
+document.getElementById('sigmaSlider').addEventListener('input', function() {
+  state.sigma = parseFloat(this.value);
+  document.getElementById('sigmaVal').textContent = state.sigma.toFixed(1);
+  render();
+});
+
+document.getElementById('kernelSlider').addEventListener('input', function() {
+  state.kernelSize = parseInt(this.value);
+  document.getElementById('kernelVal').textContent = state.kernelSize+'×'+state.kernelSize;
+  render();
+});
+
+document.getElementById('tLowSlider').addEventListener('input', function() {
+  state.tLow = parseInt(this.value);
+  if (state.tLow >= state.tHigh) { state.tHigh = state.tLow + 1; document.getElementById('tHighSlider').value = state.tHigh; document.getElementById('tHighVal').textContent = state.tHigh; }
+  document.getElementById('tLowVal').textContent = state.tLow;
+  render();
+});
+
+document.getElementById('tHighSlider').addEventListener('input', function() {
+  state.tHigh = parseInt(this.value);
+  if (state.tHigh <= state.tLow) { state.tLow = state.tHigh - 1; document.getElementById('tLowSlider').value = state.tLow; document.getElementById('tLowVal').textContent = state.tLow; }
+  document.getElementById('tHighVal').textContent = state.tHigh;
+  render();
+});
+
+document.getElementById('btnDraw').addEventListener('click', function() {
+  state.drawMode = 'draw';
+  this.classList.add('active');
+  document.getElementById('btnErase').classList.remove('active');
+});
+
+document.getElementById('btnErase').addEventListener('click', function() {
+  state.drawMode = 'erase';
+  this.classList.add('active');
+  document.getElementById('btnDraw').classList.remove('active');
+});
+
+document.getElementById('btnShapes').addEventListener('click', () => {
+  state.currentStage = 0;
+  document.querySelectorAll('.stage-tab').forEach(t => t.classList.toggle('active', t.dataset.stage === '0'));
+  loadShapes();
+});
+
+document.getElementById('btnPhoto').addEventListener('click', () => {
+  state.currentStage = 0;
+  document.querySelectorAll('.stage-tab').forEach(t => t.classList.toggle('active', t.dataset.stage === '0'));
+  loadPhoto();
+});
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  sCtx.fillStyle = '#000';
+  sCtx.fillRect(0, 0, W, H);
+  render();
+});
+
+// Presets
+const presets = {
+  fine:   { sigma: 0.8, kernelSize: 3, tLow: 20, tHigh: 50 },
+  strong: { sigma: 1.0, kernelSize: 5, tLow: 60, tHigh: 150 },
+  clean:  { sigma: 1.4, kernelSize: 5, tLow: 30, tHigh: 90 },
+  soft:   { sigma: 3.0, kernelSize: 9, tLow: 15, tHigh: 60 },
+};
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const p = presets[btn.dataset.preset];
+    state.sigma = p.sigma; state.kernelSize = p.kernelSize;
+    state.tLow = p.tLow; state.tHigh = p.tHigh;
+    document.getElementById('sigmaSlider').value = p.sigma;
+    document.getElementById('kernelSlider').value = p.kernelSize;
+    document.getElementById('tLowSlider').value = p.tLow;
+    document.getElementById('tHighSlider').value = p.tHigh;
+    document.getElementById('sigmaVal').textContent = p.sigma.toFixed(1);
+    document.getElementById('kernelVal').textContent = p.kernelSize+'×'+p.kernelSize;
+    document.getElementById('tLowVal').textContent = p.tLow;
+    document.getElementById('tHighVal').textContent = p.tHigh;
+    render();
+  });
+});
+
+// ===================== INIT =====================
+sCtx.fillStyle = '#000';
+sCtx.fillRect(0, 0, W, H);
+loadShapes();
+</script>
+</body>
+</html>
