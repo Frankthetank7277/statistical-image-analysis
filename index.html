@@ -42,7 +42,6 @@
     overflow-x: hidden;
   }
 
-  /* Radial gradient atmosphere */
   body::before {
     content: '';
     position: fixed;
@@ -56,7 +55,6 @@
     z-index: 0;
   }
 
-  /* Fine dot-matrix background — medical display feel */
   body::after {
     content: '';
     position: fixed;
@@ -67,7 +65,6 @@
     z-index: 0;
   }
 
-  /* ── Scan header canvas ── */
   .scan-header {
     position: relative;
     z-index: 1;
@@ -80,7 +77,6 @@
   }
   #scanCanvas { display: block; width: 100%; height: 100%; }
 
-  /* ── Title block ── */
   .meta-strip {
     position: relative;
     z-index: 1;
@@ -127,7 +123,6 @@
   }
   .meta-tag span { color: var(--cyan); }
 
-  /* ── Info bar ── */
   .info-bar {
     position: relative;
     z-index: 1;
@@ -162,7 +157,6 @@
     color: var(--cyan);
   }
 
-  /* ── Section header ── */
   .section-header {
     position: relative;
     z-index: 1;
@@ -186,7 +180,6 @@
     background: var(--border);
   }
 
-  /* ── Module list ── */
   .module-list {
     position: relative;
     z-index: 1;
@@ -305,7 +298,6 @@
   }
   .module-item a:hover .module-arrow { opacity: 1; transform: translateX(3px); }
 
-  /* ── Footer ── */
   .footer {
     position: relative;
     z-index: 1;
@@ -323,7 +315,6 @@
     letter-spacing: 0.12em;
   }
 
-  /* ── Animations ── */
   .scan-header, .meta-strip, .info-bar, .section-header {
     animation: slideUp 0.5s ease both;
   }
@@ -340,6 +331,7 @@
   .module-item:nth-child(5) { animation-delay: 0.6s; }
   .module-item:nth-child(6) { animation-delay: 0.7s; }
   .module-item:nth-child(7) { animation-delay: 0.8s; }
+  .module-item:nth-child(8) { animation-delay: 0.9s; }
 
   @keyframes slideUp {
     from { opacity: 0; transform: translateY(10px); }
@@ -502,6 +494,22 @@
     </a>
   </li>
 
+  <li class="module-item" style="--item-color: #f38ba8">
+    <a href="edge_detection_explorer.html">
+      <div class="module-left">
+        <span class="module-index">08</span>
+        <div class="module-info">
+          <div class="module-name">Edge Detection Explorer</div>
+          <div class="module-desc">Canny · Sobel · Hough Transform · RANSAC · LoG · interactive</div>
+        </div>
+      </div>
+      <div class="module-right">
+        <span class="module-tag">Edge / Lines</span>
+        <span class="module-arrow">→</span>
+      </div>
+    </a>
+  </li>
+
   <!-- Add new files below this line -->
 
 </ul>
@@ -518,8 +526,6 @@
   document.getElementById('timestamp').textContent =
     new Date().toISOString().slice(0,10);
 
-  // ── Animated scan-strip header ──
-  // Renders a pseudo tissue intensity profile with a moving scan cursor
   const canvas = document.getElementById('scanCanvas');
   const ctx = canvas.getContext('2d');
 
@@ -533,7 +539,6 @@
   const W = () => canvas.offsetWidth;
   const H = () => canvas.offsetHeight;
 
-  // Sum of Gaussians — simulates a tissue cross-section intensity profile
   function tissueProfile(x, w) {
     const t = x / w;
     const peaks = [
@@ -561,14 +566,11 @@
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, w, h);
 
-    // Dark background
     ctx.fillStyle = '#0c0e18';
     ctx.fillRect(0, 0, w, h);
 
-    // Build profile
     const profile = Array.from({length: w}, (_, x) => tissueProfile(x, w));
 
-    // Filled area under curve
     const areaGrad = ctx.createLinearGradient(0, 0, 0, h);
     areaGrad.addColorStop(0,   'rgba(74,158,255,0.0)');
     areaGrad.addColorStop(0.35,'rgba(74,158,255,0.16)');
@@ -584,7 +586,6 @@
     ctx.fillStyle = areaGrad;
     ctx.fill();
 
-    // Profile line
     ctx.beginPath();
     for (let x = 0; x < w; x++) {
       const y = h - profile[x] * h * 0.78;
@@ -594,7 +595,6 @@
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Ruler ticks along bottom edge
     ctx.strokeStyle = 'rgba(74,158,255,0.18)';
     ctx.lineWidth = 1;
     for (let x = 0; x < w; x += 28) {
@@ -605,7 +605,6 @@
       ctx.stroke();
     }
 
-    // Scan cursor glow
     scanX = (scanX + 0.7) % (w + 60);
     const cx = scanX - 30;
     const scanGrad = ctx.createLinearGradient(cx - 24, 0, cx + 24, 0);
@@ -615,7 +614,6 @@
     ctx.fillStyle = scanGrad;
     ctx.fillRect(cx - 24, 0, 48, h);
 
-    // Cursor line
     ctx.beginPath();
     ctx.moveTo(cx, 0);
     ctx.lineTo(cx, h);
