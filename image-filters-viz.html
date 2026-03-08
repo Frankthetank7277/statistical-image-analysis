@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Filters — Derivation & Intuition</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181c24;
+    --border: #252a36;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #7fff6b;
+    --accent4: #c084fc;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --pos: #00e5ff;
+    --neg: #ff6b35;
+    --zero: #252a36;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    padding: 48px 40px 32px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(0,229,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-tag {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 4vw, 52px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+  h1 span { color: var(--accent); }
+  .header-sub {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* NAV TABS */
+  nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 40px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 14px 20px;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* MAIN */
+  main { padding: 40px; max-width: 1200px; margin: 0 auto; }
+
+  .section { display: none; }
+  .section.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .section-desc { color: var(--muted); margin-bottom: 32px; font-size: 12px; line-height: 1.7; }
+
+  /* GRID */
+  .grid { display: grid; gap: 20px; }
+  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #353c4e; }
+  .card-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .card-body { color: var(--muted); font-size: 12px; line-height: 1.7; }
+  .card-body strong { color: var(--text); }
+
+  /* KERNEL GRID */
+  .kernel-wrap {
+    margin: 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .kernel {
+    display: grid;
+    gap: 3px;
+  }
+  .kernel.k3 { grid-template-columns: repeat(3, 44px); }
+  .kernel.k5 { grid-template-columns: repeat(5, 36px); }
+  .kernel-cell {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    transition: transform 0.15s;
+    cursor: default;
+    position: relative;
+  }
+  .kernel.k5 .kernel-cell { height: 36px; font-size: 11px; }
+  .kernel-cell:hover { transform: scale(1.08); z-index: 1; }
+  .cell-pos { background: rgba(0,229,255,0.15); color: var(--pos); border: 1px solid rgba(0,229,255,0.3); }
+  .cell-neg { background: rgba(255,107,53,0.15); color: var(--neg); border: 1px solid rgba(255,107,53,0.3); }
+  .cell-zero { background: var(--zero); color: var(--muted); border: 1px solid #2e3447; }
+  .cell-mid { background: rgba(127,255,107,0.12); color: var(--accent3); border: 1px solid rgba(127,255,107,0.25); }
+  .cell-hi { background: rgba(0,229,255,0.25); color: var(--pos); border: 1px solid rgba(0,229,255,0.5); }
+
+  .kernel-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 2px;
+  }
+  .dot-pos { background: rgba(0,229,255,0.4); }
+  .dot-neg { background: rgba(255,107,53,0.4); }
+  .dot-zero { background: #252a36; border: 1px solid #3a4050; }
+
+  /* FORMULA BOX */
+  .formula {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 12px;
+    margin: 12px 0;
+    color: var(--accent3);
+    letter-spacing: 0.01em;
+  }
+
+  /* SUM BADGE */
+  .sum-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+  }
+  .sum-zero { background: rgba(255,107,53,0.12); color: var(--neg); border: 1px solid rgba(255,107,53,0.25); }
+  .sum-one { background: rgba(0,229,255,0.12); color: var(--pos); border: 1px solid rgba(0,229,255,0.25); }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  /* INTERACTIVE CONVOLUTION */
+  .conv-wrapper {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+  .conv-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .conv-desc { color: var(--muted); font-size: 11px; margin-bottom: 20px; }
+
+  .conv-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 7px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: rgba(0,229,255,0.1); border-color: var(--accent); color: var(--accent); }
+
+  .conv-grid-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .conv-block { }
+  .conv-block-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .pixel-grid {
+    display: grid;
+    gap: 2px;
+  }
+  .pixel-grid.pg5 { grid-template-columns: repeat(5, 40px); }
+  .pixel-grid.pg3 { grid-template-columns: repeat(3, 40px); }
+  .pixel-cell {
+    width: 40px; height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    cursor: default;
+  }
+  .pixel-cell.highlighted { border-color: var(--accent) !important; }
+
+  .op-sym {
+    font-size: 24px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    padding-top: 20px;
+  }
+
+  .result-display {
+    margin-top: 16px;
+    padding: 14px;
+    background: var(--surface2);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+  .result-display .calc { color: var(--muted); }
+  .result-display .result-val { color: var(--accent); font-weight: 700; font-size: 15px; }
+
+  /* DIRECTION VIZ */
+  .dir-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+  }
+  .dir-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+  }
+  .dir-card-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .mini-image {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    margin: 0 auto 12px;
+    width: fit-content;
+  }
+  .mini-cell {
+    width: 24px; height: 24px;
+    border-radius: 2px;
+  }
+  .dir-response {
+    font-size: 11px;
+    margin-top: 8px;
+  }
+  .dir-response span { font-size: 14px; font-weight: 700; }
+  .resp-high span { color: var(--accent3); }
+  .resp-none span { color: var(--muted); }
+
+  /* EIGENVALUE VIZ */
+  .eigen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+  .eigen-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+  }
+  .eigen-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .eigen-bars {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    align-items: flex-end;
+    height: 60px;
+    margin-bottom: 12px;
+  }
+  .eigen-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .eigen-bar {
+    width: 24px;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.4s;
+  }
+  .eigen-bar-label { font-size: 10px; color: var(--muted); }
+  .eigen-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .eigen-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  /* SUMMARY TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 400;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1a1e28;
+    color: var(--text);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .tag-zero { background: rgba(255,107,53,0.12); color: var(--neg); }
+  .tag-one { background: rgba(0,229,255,0.12); color: var(--pos); }
+
+  /* TOOLTIP */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e2330;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: #252a36; border-radius: 3px; }
+
+  /* SEPARABLE VIZ */
+  .sep-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+  .sep-label { font-size: 11px; color: var(--muted); }
+  .kernel-1d {
+    display: flex;
+    gap: 3px;
+  }
+  .k1d-cell {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+    font-size: 13px; font-weight: 700;
+  }
+
+  @media (max-width: 600px) {
+    header, nav, main { padding-left: 20px; padding-right: 20px; }
+    .kernel-cell { width: 38px; height: 38px; }
+    .kernel.k3 { grid-template-columns: repeat(3, 38px); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-tag">BIOE 484 · Statistical Analysis of Images</div>
+  <h1>Image <span>Filters</span><br>Derivation & Intuition</h1>
+  <p class="header-sub">Interactive reference — kernels, math, spatial reasoning, corner detection</p>
+</header>
+
+<nav>
+  <button class="tab active" onclick="showSection('overview', this)">Overview</button>
+  <button class="tab" onclick="showSection('smoothing', this)">Smoothing</button>
+  <button class="tab" onclick="showSection('derivatives', this)">Derivatives</button>
+  <button class="tab" onclick="showSection('direction', this)">H vs V Edges</button>
+  <button class="tab" onclick="showSection('corners', this)">Corner Detection</button>
+  <button class="tab" onclick="showSection('interactive', this)">Interactive</button>
+  <button class="tab" onclick="showSection('summary', this)">Summary</button>
+</nav>
+
+<main>
+
+<!-- OVERVIEW -->
+<div class="section active" id="overview">
+  <div class="section-title">What Filter Values Mean</div>
+  <p class="section-desc">Filter weights define a weighted sum over a local pixel neighborhood. The spatial arrangement of + and − values encodes exactly which mathematical operation is performed — and which image structures produce a response.</p>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-label">Principle 1</div>
+      <div class="card-title">Weights that sum to 1</div>
+      <p class="card-body"><strong>Smoothing filters.</strong> A uniform region stays the same value. These filters measure signal level — they blur by averaging neighboring pixels.</p>
+      <div class="formula">output(flat region) = value × Σwᵢ = value × 1 = value</div>
+      <div class="sum-badge sum-one">Σ weights = 1 · Smoothing</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Principle 2</div>
+      <div class="card-title">Weights that sum to 0</div>
+      <p class="card-body"><strong>Derivative filters.</strong> Produce zero on uniform regions. Only fire where there is <em>change</em>. Used for edge and corner detection.</p>
+      <div class="formula">output(flat region) = value × Σwᵢ = value × 0 = 0</div>
+      <div class="sum-badge sum-zero">Σ weights = 0 · Derivative</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-title" style="font-size:16px; margin-bottom:20px;">All Filters at a Glance</div>
+  <div class="grid grid-3">
+
+    <div class="card">
+      <div class="card-label">Smoothing</div>
+      <div class="card-title">Box Filter</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="box-kernel"></div>
+        <div class="kernel-legend">
+          <div class="legend-item"><div class="legend-dot dot-pos"></div><span style="color:var(--muted)">equal weight</span></div>
+        </div>
+      </div>
+      <div class="sum-badge sum-one">Σ = 1</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Smoothing</div>
+      <div class="card-title">Gaussian Filter</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="gauss-kernel"></div>
+        <div class="kernel-legend">
+          <div class="legend-item"><div class="legend-dot dot-pos"></div><span style="color:var(--muted)">center weighted</span></div>
+        </div>
+      </div>
+      <div class="sum-badge sum-one">Σ = 1</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">1st Derivative</div>
+      <div class="card-title">Sobel (horizontal)</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="sobel-kernel"></div>
+        <div class="kernel-legend">
+          <div class="legend-item"><div class="legend-dot dot-neg"></div><span style="color:var(--muted)">−</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(127,255,107,0.3)"></div><span style="color:var(--muted)">0</span></div>
+          <div class="legend-item"><div class="legend-dot dot-pos"></div><span style="color:var(--muted)">+</span></div>
+        </div>
+      </div>
+      <div class="sum-badge sum-zero">Σ = 0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">1st Derivative</div>
+      <div class="card-title">Prewitt (horizontal)</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="prewitt-kernel"></div>
+      </div>
+      <div class="sum-badge sum-zero">Σ = 0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">2nd Derivative</div>
+      <div class="card-title">Laplacian</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="lap-kernel"></div>
+      </div>
+      <div class="sum-badge sum-zero">Σ = 0</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">2nd Derivative + Smooth</div>
+      <div class="card-title">LoG (5×5)</div>
+      <div class="kernel-wrap">
+        <div class="kernel k5" id="log-kernel"></div>
+      </div>
+      <div class="sum-badge sum-zero">Σ = 0</div>
+    </div>
+  </div>
+</div>
+
+<!-- SMOOTHING -->
+<div class="section" id="smoothing">
+  <div class="section-title">Smoothing Filters</div>
+  <p class="section-desc">Both filters compute a weighted average. The difference is <em>how</em> they weight neighbors. Weights sum to 1 — a flat region passes through unchanged.</p>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-label">Box Filter</div>
+      <div class="card-title">Every neighbor counts equally</div>
+      <div class="formula">f_out = (1/9) Σ f(xᵢ)</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="box2-kernel"></div>
+      </div>
+      <p class="card-body">Simple arithmetic mean over the 3×3 patch. A pixel 2 steps away is weighted identically to one directly adjacent. This causes visible "blocky" blurring because it doesn't respect distance.</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Gaussian Filter</div>
+      <div class="card-title">Closer pixels weighted more</div>
+      <div class="formula">G(x,y) = (1/2πσ²) · exp(−(x²+y²)/2σ²)</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="gauss2-kernel"></div>
+      </div>
+      <p class="card-body">Sample the 2D Gaussian at integer offsets, then normalize. The center gets weight 4, edges get 2, corners get 1 — naturally falling off with distance.</p>
+      <hr class="divider" style="margin:16px 0">
+      <div class="card-label" style="margin-bottom:8px">Separability: outer product of two 1D kernels</div>
+      <div class="sep-wrap">
+        <div class="kernel-1d">
+          <div class="k1d-cell cell-pos" style="width:36px;height:36px">1</div>
+          <div class="k1d-cell cell-hi" style="width:36px;height:36px">2</div>
+          <div class="k1d-cell cell-pos" style="width:36px;height:36px">1</div>
+        </div>
+        <div class="sep-label" style="font-size:18px">⊗</div>
+        <div class="kernel-1d" style="flex-direction:column">
+          <div class="k1d-cell cell-pos" style="width:36px;height:36px">1</div>
+          <div class="k1d-cell cell-hi" style="width:36px;height:36px">2</div>
+          <div class="k1d-cell cell-pos" style="width:36px;height:36px">1</div>
+        </div>
+        <div class="sep-label" style="font-size:18px">=</div>
+        <div class="kernel k3" id="gauss-sep-kernel"></div>
+      </div>
+      <p class="card-body" style="margin-top:8px">The 2D filter is the outer product of [1,2,1] with itself. Center = 2×2 = 4. Corner = 1×1 = 1. This separability means you can apply two 1D passes instead of one 2D pass — faster computation.</p>
+    </div>
+  </div>
+</div>
+
+<!-- DERIVATIVES -->
+<div class="section" id="derivatives">
+  <div class="section-title">Derivative Filters</div>
+  <p class="section-desc">Derived from finite difference approximations of derivatives. Weights sum to zero — zero response on flat regions, large response where intensity changes.</p>
+
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-label">From 1D Calculus</div>
+      <div class="card-title">Finite Difference → Filter Weights</div>
+      <p class="card-body" style="margin-bottom:12px">The derivative approximation directly gives the kernel weights:</p>
+      <div class="formula">f'(x) ≈ f(x+1) − f(x−1)  →  [−1, 0, +1]</div>
+      <div class="formula" style="margin-top:8px">f''(x) ≈ f(x+1) − 2f(x) + f(x−1)  →  [1, −2, 1]</div>
+      <p class="card-body" style="margin-top:12px">Apply twice: [−1,1] convolved with [−1,1] = [1,−2,1]. This is how the Laplacian center weight of −4 arises: −2 from x-direction + −2 from y-direction.</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Prewitt vs Sobel</div>
+      <div class="card-title">Smoothing strategy differs</div>
+      <p class="card-body" style="margin-bottom:14px">Both compute a 1st derivative. The difference is how they smooth <em>perpendicular</em> to the gradient direction:</p>
+      <div style="display:flex; gap:20px; flex-wrap:wrap">
+        <div>
+          <div class="card-label" style="margin-bottom:6px">Prewitt — equal rows [1,1,1]</div>
+          <div class="kernel k3" id="prewitt2-kernel"></div>
+        </div>
+        <div>
+          <div class="card-label" style="margin-bottom:6px">Sobel — Gaussian rows [1,2,1]</div>
+          <div class="kernel k3" id="sobel2-kernel"></div>
+        </div>
+      </div>
+      <p class="card-body" style="margin-top:14px">Sobel weights the center row (closest to the point of interest) twice as much. The ±2 come entirely from the smoothing weights — not from the derivative itself.</p>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-label">2nd Derivative</div>
+      <div class="card-title">Laplacian: ∇²f = ∂²f/∂x² + ∂²f/∂y²</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="lap2-kernel"></div>
+        <div style="font-size:11px; color:var(--muted); line-height:1.8">
+          Center −4 =<br>
+          −2 (from x) +<br>
+          −2 (from y)
+        </div>
+      </div>
+      <p class="card-body">Detects rapid changes in gradient. Zero-crossings mark edge locations precisely. Flat region → 0. Peak → large negative. Edge → sign flip on either side.</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Smoothed 2nd Derivative</div>
+      <div class="card-title">Laplacian of Gaussian (LoG)</div>
+      <div class="kernel-wrap">
+        <div class="kernel k5" id="log2-kernel"></div>
+      </div>
+      <div class="formula" style="font-size:10px; line-height:1.6">LoG(x,y) = −(1/πσ⁴)[1 − (x²+y²)/2σ²] · exp(−(x²+y²)/2σ²)</div>
+      <p class="card-body" style="margin-top:10px">"Mexican hat" shape: positive center, negative surround. Smooth first to avoid amplifying noise (differentiation amplifies high frequencies). Fires at blobs whose size matches σ.</p>
+    </div>
+  </div>
+</div>
+
+<!-- DIRECTION -->
+<div class="section" id="direction">
+  <div class="section-title">Horizontal vs. Vertical Edge Detection</div>
+  <p class="section-desc">The spatial arrangement of + and − weights directly encodes the direction of sensitivity. A filter fires when the + region sees high values and the − region sees low values.</p>
+
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-label">Vertical Edge Detector</div>
+      <div class="card-title">Detects left-right transitions</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="vert-kernel"></div>
+        <div style="font-size:18px; color:var(--muted)">→</div>
+        <div style="font-size:11px; color:var(--muted); line-height:2">
+          − region<br>(left col)<br><br>+ region<br>(right col)
+        </div>
+      </div>
+      <p class="card-body">The +/− boundary runs <strong style="color:var(--text)">vertically</strong>. Fires when left is dark and right is bright (or vice versa). Blind to top-bottom transitions.</p>
+    </div>
+    <div class="card">
+      <div class="card-label">Horizontal Edge Detector</div>
+      <div class="card-title">Detects top-bottom transitions</div>
+      <div class="kernel-wrap">
+        <div class="kernel k3" id="horiz-kernel"></div>
+        <div style="font-size:18px; color:var(--muted)">→</div>
+        <div style="font-size:11px; color:var(--muted); line-height:2">
+          − region<br>(top row)<br><br>+ region<br>(bottom row)
+        </div>
+      </div>
+      <p class="card-body">The +/− boundary runs <strong style="color:var(--text)">horizontally</strong>. Fires when top is dark and bottom is bright. Blind to left-right transitions.</p>
+    </div>
+  </div>
+
+  <div class="conv-wrapper">
+    <div class="conv-title">Filter Response on Different Image Patches</div>
+    <div class="conv-desc">Each filter is tested against three image patches. Green = large response (detected). Gray = no response (blind).</div>
+    <div class="dir-grid" id="dir-test"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Key Insight</div>
+    <div class="card-title">Read any filter by its +/− boundary</div>
+    <p class="card-body" style="margin-bottom:16px">You can determine what edge orientation a filter detects just by finding where the positive and negative regions meet. The boundary between + and − is the edge it detects.</p>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px;">
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:14px; text-align:center">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.1em">Vertical Edge Filter</div>
+        <div style="font-family:monospace; font-size:13px; line-height:2; color:var(--muted)">
+          <span style="color:var(--neg)">−</span> · <span style="color:var(--pos)">+</span><br>
+          <span style="color:var(--neg)">−</span> · <span style="color:var(--pos)">+</span><br>
+          <span style="color:var(--neg)">−</span> · <span style="color:var(--pos)">+</span>
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:var(--accent)">boundary is vertical</div>
+      </div>
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:14px; text-align:center">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.1em">Horizontal Edge Filter</div>
+        <div style="font-family:monospace; font-size:13px; line-height:2; color:var(--muted)">
+          <span style="color:var(--neg)">− − −</span><br>
+          · · ·<br>
+          <span style="color:var(--pos)">+ + +</span>
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:var(--accent)">boundary is horizontal</div>
+      </div>
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:14px; text-align:center">
+        <div style="font-size:10px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.1em">Diagonal Filter</div>
+        <div style="font-family:monospace; font-size:13px; line-height:2; color:var(--muted)">
+          <span style="color:var(--neg)">−</span> <span style="color:var(--neg)">−</span> ·<br>
+          <span style="color:var(--neg)">−</span> · <span style="color:var(--pos)">+</span><br>
+          · <span style="color:var(--pos)">+</span> <span style="color:var(--pos)">+</span>
+        </div>
+        <div style="margin-top:8px; font-size:10px; color:var(--accent)">boundary is diagonal</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CORNERS -->
+<div class="section" id="corners">
+  <div class="section-title">Corner Detection — Harris</div>
+  <p class="section-desc">A corner is where intensity changes in both directions simultaneously. No single gradient filter captures this. Harris combines both gradient directions through the structure tensor.</p>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-label">Structure Tensor</div>
+    <div class="card-title">M = Σ [ Iₓ² · IₓIᵧ ; IₓIᵧ · Iᵧ² ]</div>
+    <div class="grid grid-2" style="margin-top:16px">
+      <div>
+        <p class="card-body" style="margin-bottom:12px">Compute at every pixel:</p>
+        <div class="formula">Iₓ = response of horizontal gradient filter<br>Iᵧ = response of vertical gradient filter</div>
+        <p class="card-body" style="margin-top:12px">Build the 2×2 structure tensor M, then examine its eigenvalues λ₁, λ₂ to classify the local structure.</p>
+      </div>
+      <div>
+        <table>
+          <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td style="color:var(--pos)">Iₓ²</td><td>Horizontal gradient energy</td></tr>
+            <tr><td style="color:var(--accent4)">Iᵧ²</td><td>Vertical gradient energy</td></tr>
+            <tr><td style="color:var(--accent3)">IₓIᵧ</td><td>Co-occurrence of x and y gradients</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title" style="font-size:16px; margin-bottom:16px;">Eigenvalue Classification</div>
+  <div class="eigen-grid" id="eigen-cards"></div>
+
+  <hr class="divider">
+
+  <div class="card">
+    <div class="card-label">Intuition</div>
+    <div class="card-title">Sliding window test</div>
+    <div class="dir-grid" style="margin-top:8px">
+      <div class="dir-card">
+        <div class="dir-card-title">Flat Region</div>
+        <div style="font-size:24px; margin:12px 0">⬜</div>
+        <p style="font-size:11px; color:var(--muted); line-height:1.6">Slide window in <em>any</em> direction → intensity inside doesn't change. Both eigenvalues ≈ 0.</p>
+      </div>
+      <div class="dir-card">
+        <div class="dir-card-title">Edge</div>
+        <div style="font-size:24px; margin:12px 0">◀▶</div>
+        <p style="font-size:11px; color:var(--muted); line-height:1.6">Slide <em>across</em> edge → intensity changes. Slide <em>along</em> edge → no change. One large eigenvalue, one small.</p>
+      </div>
+      <div class="dir-card">
+        <div class="dir-card-title">Corner</div>
+        <div style="font-size:24px; margin:12px 0">↗↙</div>
+        <p style="font-size:11px; color:var(--muted); line-height:1.6">Slide in <em>any</em> direction → intensity changes. Both eigenvalues large. This is the corner signature.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- INTERACTIVE -->
+<div class="section" id="interactive">
+  <div class="section-title">Interactive Convolution</div>
+  <p class="section-desc">Select a filter and a test patch to see the weighted sum computed step by step.</p>
+
+  <div class="conv-wrapper">
+    <div class="conv-title">Step-through Convolution</div>
+    <div class="conv-desc">Hover over kernel cells to see individual contributions. The output is the sum of (kernel weight × pixel value) over all cells.</div>
+
+    <div class="conv-controls" id="filter-btns">
+      <button class="filter-btn active" onclick="selectFilter('sobel_v', this)">Sobel Vertical</button>
+      <button class="filter-btn" onclick="selectFilter('sobel_h', this)">Sobel Horizontal</button>
+      <button class="filter-btn" onclick="selectFilter('laplacian', this)">Laplacian</button>
+      <button class="filter-btn" onclick="selectFilter('gaussian', this)">Gaussian</button>
+    </div>
+
+    <div style="margin-bottom:16px; font-size:11px; color:var(--muted)">Test patch:</div>
+    <div class="conv-controls" id="patch-btns">
+      <button class="filter-btn active" onclick="selectPatch('vertical_edge', this)">Vertical Edge</button>
+      <button class="filter-btn" onclick="selectPatch('horizontal_edge', this)">Horizontal Edge</button>
+      <button class="filter-btn" onclick="selectPatch('flat', this)">Flat Region</button>
+      <button class="filter-btn" onclick="selectPatch('corner', this)">Corner</button>
+    </div>
+
+    <div class="conv-grid-row">
+      <div class="conv-block">
+        <div class="conv-block-label">Image Patch (3×3 center)</div>
+        <div class="pixel-grid pg3" id="patch-display"></div>
+      </div>
+      <div class="op-sym">⊛</div>
+      <div class="conv-block">
+        <div class="conv-block-label">Kernel</div>
+        <div class="pixel-grid pg3" id="kernel-display"></div>
+      </div>
+      <div class="op-sym">=</div>
+      <div class="conv-block">
+        <div class="conv-block-label">Output</div>
+        <div id="output-display" style="width:80px;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:22px;font-weight:700;font-family:'Syne',sans-serif;color:var(--accent)"></div>
+      </div>
+    </div>
+
+    <div class="result-display" id="calc-display"></div>
+  </div>
+</div>
+
+<!-- SUMMARY -->
+<div class="section" id="summary">
+  <div class="section-title">Summary</div>
+  <p class="section-desc">Quick reference for all filters covered.</p>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-label">Filter Properties</div>
+    <table>
+      <thead>
+        <tr><th>Filter</th><th>Weights Sum</th><th>Computes</th><th>Kernel Size</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Box</td><td><span class="tag tag-one">= 1</span></td><td>Mean intensity</td><td>n×n</td><td style="color:var(--muted)">Equal weights, blocky blur</td></tr>
+        <tr><td>Gaussian</td><td><span class="tag tag-one">= 1</span></td><td>Smoothed intensity</td><td>3×3, 5×5</td><td style="color:var(--muted)">Separable, σ controls spread</td></tr>
+        <tr><td>Prewitt</td><td><span class="tag tag-zero">= 0</span></td><td>1st derivative</td><td>3×3</td><td style="color:var(--muted)">Equal perpendicular weighting</td></tr>
+        <tr><td>Sobel</td><td><span class="tag tag-zero">= 0</span></td><td>1st derivative + smooth</td><td>3×3</td><td style="color:var(--muted)">Binomial perpendicular weights</td></tr>
+        <tr><td>Laplacian</td><td><span class="tag tag-zero">= 0</span></td><td>2nd derivative</td><td>3×3</td><td style="color:var(--muted)">Zero-crossings = edge locations</td></tr>
+        <tr><td>LoG</td><td><span class="tag tag-zero">= 0</span></td><td>Smoothed 2nd derivative</td><td>5×5+</td><td style="color:var(--muted)">Mexican hat, σ-scale blobs</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Structure Detection</div>
+    <table>
+      <thead>
+        <tr><th>Structure</th><th>Gradient in x?</th><th>Gradient in y?</th><th>Harris λ₁, λ₂</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Flat region</td><td style="color:var(--muted)">No</td><td style="color:var(--muted)">No</td><td style="color:var(--muted)">≈ 0, ≈ 0</td></tr>
+        <tr><td>Vertical edge</td><td style="color:var(--accent3)">Yes</td><td style="color:var(--muted)">No</td><td>large, ≈ 0</td></tr>
+        <tr><td>Horizontal edge</td><td style="color:var(--muted)">No</td><td style="color:var(--accent3)">Yes</td><td>≈ 0, large</td></tr>
+        <tr><td>Diagonal edge</td><td style="color:var(--accent)">Partial</td><td style="color:var(--accent)">Partial</td><td>both moderate</td></tr>
+        <tr><td>Corner</td><td style="color:var(--accent3)">Yes</td><td style="color:var(--accent3)">Yes</td><td style="color:var(--accent)">large, large</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ─── KERNEL DEFINITIONS ────────────────────────────────────────────────
+const kernels = {
+  box:      [[1,1,1],[1,1,1],[1,1,1]],
+  gauss:    [[1,2,1],[2,4,2],[1,2,1]],
+  sobel_v:  [[-1,0,1],[-2,0,2],[-1,0,1]],
+  sobel_h:  [[-1,-2,-1],[0,0,0],[1,2,1]],
+  prewitt_v:[[-1,0,1],[-1,0,1],[-1,0,1]],
+  prewitt_h:[[-1,-1,-1],[0,0,0],[1,1,1]],
+  lap:      [[0,1,0],[1,-4,1],[0,1,0]],
+  log:      [[0,0,-1,0,0],[0,-1,-2,-1,0],[-1,-2,16,-2,-1],[0,-1,-2,-1,0],[0,0,-1,0,0]]
+};
+
+const patches = {
+  vertical_edge:   [[10,10,80],[10,10,80],[10,10,80]],
+  horizontal_edge: [[10,10,10],[10,10,10],[80,80,80]],
+  flat:            [[50,50,50],[50,50,50],[50,50,50]],
+  corner:          [[10,10,80],[10,10,80],[80,80,80]]
+};
+
+// ─── CELL CLASS ────────────────────────────────────────────────────────
+function cellClass(v, isKernel) {
+  if (!isKernel) return '';
+  if (v > 4) return 'cell-hi';
+  if (v > 0) return 'cell-pos';
+  if (v < 0) return 'cell-neg';
+  return 'cell-zero';
+}
+
+function makeKernel(data, containerId, isK5) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  el.className = `kernel ${isK5 ? 'k5' : 'k3'}`;
+  data.forEach(row => row.forEach(v => {
+    const d = document.createElement('div');
+    d.className = `kernel-cell ${cellClass(v, true)}`;
+    d.textContent = v;
+    el.appendChild(d);
+  }));
+}
+
+function pixelColor(v) {
+  const g = Math.round(v);
+  return `rgb(${g},${g},${g})`;
+}
+
+function textColor(v) {
+  return v > 128 ? '#000' : '#fff';
+}
+
+// ─── INIT KERNELS ──────────────────────────────────────────────────────
+makeKernel(kernels.box,       'box-kernel');
+makeKernel(kernels.gauss,     'gauss-kernel');
+makeKernel(kernels.sobel_v,   'sobel-kernel');
+makeKernel(kernels.prewitt_v, 'prewitt-kernel');
+makeKernel(kernels.lap,       'lap-kernel');
+makeKernel(kernels.log,       'log-kernel', true);
+
+makeKernel(kernels.box,       'box2-kernel');
+makeKernel(kernels.gauss,     'gauss2-kernel');
+makeKernel(kernels.gauss,     'gauss-sep-kernel');
+
+makeKernel(kernels.prewitt_v, 'prewitt2-kernel');
+makeKernel(kernels.sobel_v,   'sobel2-kernel');
+makeKernel(kernels.lap,       'lap2-kernel');
+makeKernel(kernels.log,       'log2-kernel', true);
+
+makeKernel(kernels.sobel_v,   'vert-kernel');
+makeKernel(kernels.sobel_h,   'horiz-kernel');
+
+// ─── DIRECTION TEST ────────────────────────────────────────────────────
+function buildDirTest() {
+  const container = document.getElementById('dir-test');
+  const tests = [
+    { label: 'Vertical Edge', patch: patches.vertical_edge },
+    { label: 'Horizontal Edge', patch: patches.horizontal_edge },
+    { label: 'Flat Region', patch: patches.flat }
+  ];
+  const filters = [
+    { name: 'Sobel Vertical', k: kernels.sobel_v },
+    { name: 'Sobel Horizontal', k: kernels.sobel_h }
+  ];
+
+  filters.forEach(f => {
+    const col = document.createElement('div');
+    col.style.cssText = 'display:flex;flex-direction:column;gap:12px';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);padding-bottom:4px;border-bottom:1px solid var(--border)';
+    title.textContent = f.name;
+    col.appendChild(title);
+
+    tests.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'dir-card';
+      card.innerHTML = `<div class="dir-card-title">${t.label}</div>`;
+
+      // mini image
+      const img = document.createElement('div');
+      img.className = 'mini-image';
+      img.style.gridTemplateColumns = 'repeat(3,1fr)';
+      t.patch.forEach(row => row.forEach(v => {
+        const c = document.createElement('div');
+        c.className = 'mini-cell';
+        c.style.background = pixelColor(v);
+        img.appendChild(c);
+      }));
+      card.appendChild(img);
+
+      // compute response
+      let sum = 0;
+      for (let r = 0; r < 3; r++)
+        for (let c2 = 0; c2 < 3; c2++)
+          sum += f.k[r][c2] * t.patch[r][c2];
+
+      const resp = document.createElement('div');
+      resp.className = `dir-response ${Math.abs(sum) > 10 ? 'resp-high' : 'resp-none'}`;
+      resp.innerHTML = `Response: <span>${sum}</span>`;
+      card.appendChild(resp);
+
+      col.appendChild(card);
+    });
+    container.appendChild(col);
+  });
+}
+buildDirTest();
+
+// ─── EIGENVALUE CARDS ──────────────────────────────────────────────────
+function buildEigenCards() {
+  const container = document.getElementById('eigen-cards');
+  const cases = [
+    { name: 'Flat Region', l1: 0, l2: 0, desc: 'No gradient in any direction. Intensity is uniform — the window looks the same wherever you slide it.', color: '#6b7280' },
+    { name: 'Edge', l1: 85, l2: 5, desc: 'Gradient in one direction only. Large change across the edge, no change along it.', color: '#00e5ff' },
+    { name: 'Corner', l1: 85, l2: 75, desc: 'Gradient in both directions. Intensity changes when sliding in any direction.', color: '#7fff6b' }
+  ];
+  cases.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'eigen-card';
+    card.innerHTML = `
+      <div class="eigen-label">λ₁ = ${c.l1 > 10 ? 'large' : '≈ 0'}, λ₂ = ${c.l2 > 10 ? 'large' : '≈ 0'}</div>
+      <div class="eigen-bars">
+        <div class="eigen-bar-wrap">
+          <div class="eigen-bar" style="height:${c.l1}%;background:${c.color};min-height:4px"></div>
+          <div class="eigen-bar-label">λ₁</div>
+        </div>
+        <div class="eigen-bar-wrap">
+          <div class="eigen-bar" style="height:${c.l2}%;background:${c.color};opacity:0.5;min-height:4px"></div>
+          <div class="eigen-bar-label">λ₂</div>
+        </div>
+      </div>
+      <div class="eigen-name" style="color:${c.color}">${c.name}</div>
+      <div class="eigen-desc">${c.desc}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+buildEigenCards();
+
+// ─── INTERACTIVE CONVOLUTION ───────────────────────────────────────────
+let currentFilter = 'sobel_v';
+let currentPatch = 'vertical_edge';
+
+function selectFilter(name, btn) {
+  currentFilter = name;
+  document.querySelectorAll('#filter-btns .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateConv();
+}
+
+function selectPatch(name, btn) {
+  currentPatch = name;
+  document.querySelectorAll('#patch-btns .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateConv();
+}
+
+function updateConv() {
+  const k = kernels[currentFilter];
+  const p = patches[currentPatch];
+  const patchEl = document.getElementById('patch-display');
+  const kernelEl = document.getElementById('kernel-display');
+  const outputEl = document.getElementById('output-display');
+  const calcEl = document.getElementById('calc-display');
+
+  patchEl.innerHTML = ''; kernelEl.innerHTML = '';
+  patchEl.className = 'pixel-grid pg3';
+  kernelEl.className = 'pixel-grid pg3';
+
+  p.forEach(row => row.forEach(v => {
+    const c = document.createElement('div');
+    c.className = 'pixel-cell';
+    c.style.background = pixelColor(v);
+    c.style.color = textColor(v);
+    c.textContent = v;
+    patchEl.appendChild(c);
+  }));
+
+  let terms = [];
+  let sum = 0;
+  k.forEach((row, r) => row.forEach((w, c) => {
+    const v = p[r][c];
+    const contrib = w * v;
+    sum += contrib;
+
+    const kc = document.createElement('div');
+    kc.className = `pixel-cell ${cellClass(w, true)}`;
+    kc.textContent = w;
+    kernelEl.appendChild(kc);
+
+    if (w !== 0) terms.push(`(${w}×${v}=${contrib})`);
+  }));
+
+  outputEl.textContent = Math.round(sum);
+  outputEl.style.color = sum > 0 ? 'var(--pos)' : sum < 0 ? 'var(--neg)' : 'var(--muted)';
+
+  calcEl.innerHTML = `<span class="calc">= ${terms.join(' + ')}</span><br><span class="result-val">= ${Math.round(sum)}</span>`;
+}
+
+updateConv();
+
+// ─── TAB NAVIGATION ────────────────────────────────────────────────────
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
