@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Affine Transformations — Interactive Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --bg2: #131316;
+    --bg3: #1a1a1f;
+    --bg4: #222228;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e6e0;
+    --text2: #9a9890;
+    --text3: #5a5856;
+    --purple: #9b8dff;
+    --purple-dim: rgba(155,141,255,0.12);
+    --purple-border: rgba(155,141,255,0.3);
+    --teal: #4ecba4;
+    --teal-dim: rgba(78,203,164,0.12);
+    --teal-border: rgba(78,203,164,0.3);
+    --amber: #f0a94e;
+    --amber-dim: rgba(240,169,78,0.1);
+    --gray-dim: rgba(255,255,255,0.05);
+    --gray-border: rgba(255,255,255,0.1);
+    --accent: #9b8dff;
+    --red: #ff6b6b;
+    --green: #4ecba4;
+    --radius: 8px;
+    --radius-lg: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .site-header {
+    padding: 28px 40px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-top {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .header-top h1 {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .header-top .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: .04em;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+  }
+  .tab {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text3);
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+    letter-spacing: .01em;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active { color: var(--text); border-bottom-color: var(--purple); }
+
+  /* Tab panels */
+  .panel { display: none; padding: 32px 40px 48px; }
+  .panel.active { display: block; }
+
+  /* ── Interactive Tab ── */
+  .interactive-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .canvas-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; }
+
+  .presets {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .preset-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: .03em;
+  }
+  .preset-btn:hover { border-color: var(--purple-border); color: var(--purple); background: var(--purple-dim); }
+
+  .controls-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .ctrl-section {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ctrl-section:last-child { border-bottom: none; }
+
+  .ctrl-section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .ctrl-row:last-child { margin-bottom: 0; }
+  .ctrl-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    width: 72px;
+    flex-shrink: 0;
+  }
+  .ctrl-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--purple);
+    width: 42px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--bg4);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--purple);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    background: var(--purple);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  /* Matrix display */
+  .matrix-wrap {
+    padding: 16px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .matrix-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .matrix-brackets {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .bracket {
+    font-size: 52px;
+    color: var(--text3);
+    line-height: 1;
+    font-weight: 100;
+    font-family: 'DM Sans', sans-serif;
+    margin-top: -4px;
+  }
+  .matrix-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    flex: 1;
+  }
+  .mcell {
+    padding: 8px 6px;
+    border-radius: 6px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background .15s, color .15s;
+  }
+  .mcell.purple { background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple-border); }
+  .mcell.teal   { background: var(--teal-dim);   color: var(--teal);   border: 1px solid var(--teal-border); }
+  .mcell.gray   { background: var(--gray-dim);   color: var(--text3);  border: 1px solid var(--gray-border); }
+
+  .desc-box {
+    margin: 14px 18px 0;
+    padding: 10px 14px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--teal);
+    line-height: 1.6;
+    min-height: 48px;
+  }
+
+  .legend {
+    padding: 12px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text3);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* ── Notes Tab ── */
+  .notes-layout {
+    max-width: 760px;
+  }
+
+  .note-section {
+    margin-bottom: 48px;
+  }
+
+  .note-section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .note-section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 3px 9px;
+    border-radius: 4px;
+  }
+  .note-section-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text);
+  }
+
+  .note-body {
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--text2);
+    font-weight: 300;
+  }
+  .note-body p { margin-bottom: 14px; }
+  .note-body p:last-child { margin-bottom: 0; }
+  .note-body strong { color: var(--text); font-weight: 500; }
+
+  .note-body code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--purple);
+  }
+
+  .callout {
+    background: var(--purple-dim);
+    border: 1px solid var(--purple-border);
+    border-left: 3px solid var(--purple);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 18px 0;
+  }
+  .callout.teal {
+    background: var(--teal-dim);
+    border-color: var(--teal-border);
+    border-left-color: var(--teal);
+  }
+  .callout.amber {
+    background: var(--amber-dim);
+    border-color: rgba(240,169,78,0.3);
+    border-left-color: var(--amber);
+  }
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--purple);
+    margin-bottom: 7px;
+  }
+  .callout.teal .callout-label { color: var(--teal); }
+  .callout.amber .callout-label { color: var(--amber); }
+  .callout-body {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text2);
+  }
+
+  .math-block {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: var(--text);
+    line-height: 2;
+    overflow-x: auto;
+  }
+  .math-block .purple { color: var(--purple); }
+  .math-block .teal   { color: var(--teal); }
+  .math-block .amber  { color: var(--amber); }
+  .math-block .dim    { color: var(--text3); }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .summary-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+  }
+  .summary-card-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 8px;
+  }
+  .summary-card-body {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+
+  .transform-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  .transform-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    text-align: left;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .transform-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+    vertical-align: top;
+  }
+  .transform-table tr:last-child td { border-bottom: none; }
+  .transform-table td:first-child { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--purple); }
+  .transform-table td code { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--amber); background: var(--amber-dim); padding: 1px 5px; border-radius: 3px; }
+
+  footer {
+    padding: 24px 40px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-top">
+    <h1>Affine Transformations</h1>
+    <span class="tag">BIOE 484 · Biomedical Image Computing</span>
+    <span class="tag">Interactive Reference</span>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('interactive', this)">Interactive</button>
+    <button class="tab" onclick="switchTab('notes', this)">Notes</button>
+  </nav>
+</header>
+
+<!-- ══ INTERACTIVE PANEL ══ -->
+<div id="panel-interactive" class="panel active">
+  <div class="interactive-layout">
+
+    <div>
+      <div class="canvas-wrap">
+        <div class="presets">
+          <button class="preset-btn" onclick="setPreset('identity')">identity</button>
+          <button class="preset-btn" onclick="setPreset('translate')">translate</button>
+          <button class="preset-btn" onclick="setPreset('rotate45')">rotate 45°</button>
+          <button class="preset-btn" onclick="setPreset('rotate90')">rotate 90°</button>
+          <button class="preset-btn" onclick="setPreset('scaleUp')">scale up</button>
+          <button class="preset-btn" onclick="setPreset('flipX')">flip X</button>
+          <button class="preset-btn" onclick="setPreset('shear')">shear</button>
+          <button class="preset-btn" onclick="setPreset('combo')">combo</button>
+        </div>
+        <canvas id="cv" height="420"></canvas>
+      </div>
+    </div>
+
+    <div>
+      <div class="controls-panel">
+
+        <div class="ctrl-section">
+          <div class="ctrl-section-title">Translation</div>
+          <div class="ctrl-row"><span class="ctrl-label">tx (move X)</span><input type="range" id="tx" min="-120" max="120" value="0" step="1" oninput="update()"><span class="ctrl-val" id="txv">0</span></div>
+          <div class="ctrl-row"><span class="ctrl-label">ty (move Y)</span><input type="range" id="ty" min="-120" max="120" value="0" step="1" oninput="update()"><span class="ctrl-val" id="tyv">0</span></div>
+        </div>
+
+        <div class="ctrl-section">
+          <div class="ctrl-section-title">Rotation</div>
+          <div class="ctrl-row"><span class="ctrl-label">angle</span><input type="range" id="rot" min="-180" max="180" value="0" step="1" oninput="update()"><span class="ctrl-val" id="rotv">0°</span></div>
+        </div>
+
+        <div class="ctrl-section">
+          <div class="ctrl-section-title">Scale</div>
+          <div class="ctrl-row"><span class="ctrl-label">scale X</span><input type="range" id="sx" min="-200" max="200" value="100" step="1" oninput="update()"><span class="ctrl-val" id="sxv">1.00×</span></div>
+          <div class="ctrl-row"><span class="ctrl-label">scale Y</span><input type="range" id="sy" min="-200" max="200" value="100" step="1" oninput="update()"><span class="ctrl-val" id="syv">1.00×</span></div>
+        </div>
+
+        <div class="ctrl-section">
+          <div class="ctrl-section-title">Shear</div>
+          <div class="ctrl-row"><span class="ctrl-label">shear X</span><input type="range" id="shx" min="-100" max="100" value="0" step="1" oninput="update()"><span class="ctrl-val" id="shxv">0.00</span></div>
+        </div>
+
+        <div class="matrix-wrap">
+          <div class="matrix-title">Live matrix</div>
+          <div class="matrix-brackets">
+            <span class="bracket" style="font-size:58px;color:var(--text3);">[</span>
+            <div class="matrix-grid">
+              <div class="mcell purple" id="m00">1.00</div>
+              <div class="mcell purple" id="m01">0.00</div>
+              <div class="mcell teal"   id="m02">0</div>
+              <div class="mcell purple" id="m10">0.00</div>
+              <div class="mcell purple" id="m11">1.00</div>
+              <div class="mcell teal"   id="m12">0</div>
+              <div class="mcell gray"   id="m20">0</div>
+              <div class="mcell gray"   id="m21">0</div>
+              <div class="mcell gray"   id="m22">1</div>
+            </div>
+            <span class="bracket" style="font-size:58px;color:var(--text3);">]</span>
+          </div>
+          <div class="desc-box" id="desc">identity — no change applied</div>
+        </div>
+
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--purple-dim);border:1px solid var(--purple-border);"></div><span>purple — linear transform (rotation, scale, shear)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--teal-dim);border:1px solid var(--teal-border);"></div><span>teal — translation (tx, ty)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--gray-dim);border:1px solid var(--gray-border);"></div><span>gray — homogeneous row [0, 0, 1]</span></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ NOTES PANEL ══ -->
+<div id="panel-notes" class="panel">
+  <div class="notes-layout">
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">01</span>
+        <span class="note-section-title">What is an affine transformation?</span>
+      </div>
+      <div class="note-body">
+        <p>An affine transformation is any operation that maps one image (or set of points) to another while preserving <strong>parallel lines</strong> and <strong>ratios of distances along parallel lines</strong>. In practical terms: straight lines stay straight, parallel lines stay parallel, but angles and distances can change.</p>
+        <p>The set of operations captured by an affine transform includes translation (shifting), rotation, scaling, shearing, and reflection. In 2D biomedical imaging this covers the vast majority of registration scenarios — aligning two scans of the same organ, correcting for patient motion, or normalizing cell images to a common coordinate frame.</p>
+        <p>The key intuition: an affine transform is a <strong>linear transform + a translation</strong>. Those two pieces combine into one unified matrix using the homogeneous coordinate trick described below.</p>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">02</span>
+        <span class="note-section-title">Why a 3×3 matrix for 2D?</span>
+      </div>
+      <div class="note-body">
+        <p>At first glance the 3×3 structure looks wasteful — the bottom row is always <code>[0, 0, 1]</code> and seems to do nothing. But it exists to solve a fundamental problem: <strong>translation cannot be expressed as a pure matrix multiplication in 2D</strong>.</p>
+
+        <div class="callout">
+          <div class="callout-label">Core problem</div>
+          <div class="callout-body">A 2×2 matrix times a 2-vector always produces a linear combination of the input coordinates. That means the origin (0,0) always maps to (0,0) — you can never shift the image. Translation requires <em>adding a constant</em>, which is fundamentally non-linear.</div>
+        </div>
+
+        <p>The fix is the <strong>homogeneous coordinate</strong>: every 2D point <code>(x, y)</code> is represented as a 3-vector <code>(x, y, 1)</code> — that appended <code>1</code> is the homogeneous coordinate. Now a 3×3 matrix multiply can accomplish translation in the top-right column:</p>
+
+        <div class="math-block">
+<span class="dim">┌               ┐   ┌   ┐   ┌                    ┐</span>
+<span class="dim">│</span> <span class="purple">a  b</span>  <span class="teal">tx</span> <span class="dim">│</span> <span class="dim">×</span> <span class="dim">│</span> x <span class="dim">│</span> <span class="dim">=</span> <span class="dim">│</span> <span class="purple">ax + by</span> + <span class="teal">tx</span>          <span class="dim">│</span>
+<span class="dim">│</span> <span class="purple">c  d</span>  <span class="teal">ty</span> <span class="dim">│</span>   <span class="dim">│</span> y <span class="dim">│</span>   <span class="dim">│</span> <span class="purple">cx + dy</span> + <span class="teal">ty</span>          <span class="dim">│</span>
+<span class="dim">│</span> <span class="dim">0  0   1</span> <span class="dim">│</span>   <span class="dim">│</span> 1 <span class="dim">│</span>   <span class="dim">│</span> <span class="dim">1</span>  (always)            <span class="dim">│</span>
+<span class="dim">└               ┘   └   ┘   └                    ┘</span>
+        </div>
+
+        <p>The <code>tx * 1 = tx</code> term is what makes translation "show up" — the appended <code>1</code> in the input vector is literally what activates the translation column. The bottom row <code>[0, 0, 1]</code> ensures that the <code>1</code> always passes through unchanged, keeping every result in the same homogeneous space.</p>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">03</span>
+        <span class="note-section-title">Anatomy of the matrix</span>
+      </div>
+      <div class="note-body">
+        <p>The 3×3 affine matrix has three distinct functional zones:</p>
+
+        <div class="summary-grid">
+          <div class="summary-card" style="border-color:var(--purple-border);">
+            <div class="summary-card-title" style="color:var(--purple);">2×2 linear core [ a b / c d ]</div>
+            <div class="summary-card-body">Handles rotation, scale, shear, and flip. These are all <em>linear</em> transforms — they preserve the origin. The origin (0,0) always maps to (0,0) through this block alone.</div>
+          </div>
+          <div class="summary-card" style="border-color:var(--teal-border);">
+            <div class="summary-card-title" style="color:var(--teal);">Translation column [ tx / ty ]</div>
+            <div class="summary-card-body">Pure shift in X and Y. Completely isolated from the linear part — changing tx/ty never affects rotation or scale. This separation is clean because of the homogeneous coordinate structure.</div>
+          </div>
+          <div class="summary-card" style="border-color:var(--border2);">
+            <div class="summary-card-title" style="color:var(--text3);">Homogeneous row [ 0 0 1 ]</div>
+            <div class="summary-card-body">Always fixed in 2D affine transforms. Ensures the homogeneous coordinate propagates through unchanged. In projective (homography) transforms, this row takes non-zero values to create perspective distortion.</div>
+          </div>
+          <div class="summary-card" style="border-color:var(--amber-dim);border-left:2px solid var(--amber);">
+            <div class="summary-card-title" style="color:var(--amber);">Input vector [ x / y / 1 ]</div>
+            <div class="summary-card-body">Every point gets an appended 1. This is the homogeneous coordinate — without it, the translation column has nothing to multiply against and the shift is lost.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">04</span>
+        <span class="note-section-title">Each transform type — what's actually changing</span>
+      </div>
+      <div class="note-body">
+        <table class="transform-table">
+          <thead>
+            <tr><th>Transform</th><th>What changes in the matrix</th><th>Physical intuition</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Rotation θ</td>
+              <td><code>a=cosθ, b=−sinθ, c=sinθ, d=cosθ</code></td>
+              <td>Rotates about the origin. All four purple cells change in a coordinated way because rotation mixes x and y together — "how much of the old x ends up in the new x/y."</td>
+            </tr>
+            <tr>
+              <td>Scale</td>
+              <td><code>a=sx, d=sy</code> (off-diag = 0)</td>
+              <td>Stretches or compresses each axis independently. Negative scale = flip. sx=−1 mirrors left-right.</td>
+            </tr>
+            <tr>
+              <td>Shear X</td>
+              <td><code>b=shx</code></td>
+              <td>Slides rows horizontally proportional to their Y position. Like italicizing a rectangle — top slides right, bottom stays, middle moves in between.</td>
+            </tr>
+            <tr>
+              <td>Translation</td>
+              <td><code>tx, ty</code> in right column</td>
+              <td>Pure pixel shift. Completely independent of the 2×2 block. This is the only transform that truly requires the 3×3 structure.</td>
+            </tr>
+            <tr>
+              <td>Identity</td>
+              <td><code>a=d=1, all others=0</code></td>
+              <td>No change. Every point maps to itself. The reference point — "doing nothing" is still a valid matrix.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">05</span>
+        <span class="note-section-title">Transform composition — the practical payoff</span>
+      </div>
+      <div class="note-body">
+        <p>Because everything lives in a single matrix, you can <strong>chain transforms by multiplying their matrices together before touching a single pixel</strong>. This is the real practical payoff of the homogeneous coordinate trick.</p>
+
+        <div class="callout teal">
+          <div class="callout-label">Example</div>
+          <div class="callout-body">Rotate 30°, then scale by 1.5×, then translate by (50, 20)? Multiply M_rotate × M_scale × M_translate into one matrix M_combined. Apply M_combined to every point once. Same result, far fewer operations — especially critical when processing millions of pixels.</div>
+        </div>
+
+        <p>Note that <strong>matrix multiplication is not commutative</strong> for transforms. Rotate-then-translate is different from translate-then-rotate. The order matters physically: the second matrix is applied first (standard right-to-left convention in most libraries).</p>
+
+        <div class="callout amber">
+          <div class="callout-label">In biomedical imaging</div>
+          <div class="callout-body">This composability is why affine registration pipelines can build up complex multi-step alignments efficiently. OpenCV's <code>warpAffine</code>, PyTorch's <code>affine_grid</code>, and Cellpose's spatial transform internals all rely on this matrix representation. The 3×3 form also generalizes cleanly to 3D: a 4×4 matrix with the same structure handles volumetric image registration.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">06</span>
+        <span class="note-section-title">Your summary (verified correct)</span>
+      </div>
+      <div class="note-body">
+        <p>After working through the interactive demo, these are the key takeaways — confirmed accurate:</p>
+        <ul style="padding-left:20px; line-height:2.2; color:var(--text2);">
+          <li>The <strong style="color:var(--purple);">2×2 purple core</strong> handles linear transforms: rotation, scale, shear, and flip. The unifying property is that they all preserve the origin — mathematically they are expressible as pure linear combinations of x and y.</li>
+          <li>The <strong style="color:var(--teal);">teal translation column</strong> captures the constant shift (tx, ty) that a pure 2×2 matrix cannot express.</li>
+          <li>The <strong>full 3×3 structure with the homogeneous row</strong> is what unifies both into a single matrix multiply — no separate addition step needed.</li>
+          <li>Appending <code>1</code> to every input point <code>(x, y, 1)</code> is what "activates" the translation column — <code>tx × 1 = tx</code> delivers the shift.</li>
+          <li>The composability of matrix multiplication is the core practical benefit: chain any sequence of transforms into one matrix, apply once.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <span>affine_transform.html · BIOE 484</span>
+  <span>Frank Lato · UIUC · 2026</span>
+</footer>
+
+<script>
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.parentElement.offsetWidth || 600;
+const H = 420;
+cv.width = W; cv.height = H;
+
+function getVals() {
+  return {
+    tx:  +document.getElementById('tx').value,
+    ty:  +document.getElementById('ty').value,
+    rot: +document.getElementById('rot').value * Math.PI / 180,
+    sx:  +document.getElementById('sx').value / 100,
+    sy:  +document.getElementById('sy').value / 100,
+    shx: +document.getElementById('shx').value / 100,
+  };
+}
+
+function buildMatrix(v) {
+  const cr = Math.cos(v.rot), sr = Math.sin(v.rot);
+  return {
+    a:  v.sx * cr + v.shx * (-sr),
+    b:  v.sx * sr + v.shx * cr,
+    c:  v.sy * (-sr),
+    d:  v.sy * cr,
+    tx: v.tx,
+    ty: v.ty,
+  };
+}
+
+function applyM(m, x, y) {
+  return [m.a*x + m.b*y + m.tx, m.c*x + m.d*y + m.ty];
+}
+
+const shape = [[-55,-40],[55,-40],[55,40],[-55,40]];
+const innerX = [[-20,0],[20,0],[0,0],[0,-20],[0,20]];
+
+function drawArrow(x1, y1, x2, y2, color) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  const angle = Math.atan2(y2-y1, x2-x1);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 8*Math.cos(angle-0.4), y2 - 8*Math.sin(angle-0.4));
+  ctx.lineTo(x2 - 8*Math.cos(angle+0.4), y2 - 8*Math.sin(angle+0.4));
+  ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+}
+
+function draw() {
+  const v = getVals();
+  const m = buildMatrix(v);
+  const ox = W/2, oy = H/2;
+
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.fillStyle = '#0d0d0f';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 0.5;
+  for(let x = -300; x <= 300; x += 40) { ctx.beginPath(); ctx.moveTo(ox+x,0); ctx.lineTo(ox+x,H); ctx.stroke(); }
+  for(let y = -250; y <= 250; y += 40) { ctx.beginPath(); ctx.moveTo(0,oy+y); ctx.lineTo(W,oy+y); ctx.stroke(); }
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(ox,0); ctx.lineTo(ox,H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,oy); ctx.lineTo(W,oy); ctx.stroke();
+
+  drawArrow(ox, oy, ox+36, oy, 'rgba(155,141,255,0.5)');
+  drawArrow(ox, oy, ox, oy-36, 'rgba(78,203,164,0.5)');
+  ctx.fillStyle = 'rgba(155,141,255,0.5)'; ctx.font = '11px JetBrains Mono, monospace';
+  ctx.fillText('x', ox+40, oy+4);
+  ctx.fillStyle = 'rgba(78,203,164,0.5)';
+  ctx.fillText('y', ox+5, oy-40);
+
+  ctx.beginPath();
+  ctx.moveTo(ox+shape[0][0], oy+shape[0][1]);
+  for(let i=1;i<shape.length;i++) ctx.lineTo(ox+shape[i][0], oy+shape[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(155,141,255,0.1)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(155,141,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(155,141,255,0.5)'; ctx.font = '11px JetBrains Mono, monospace';
+  ctx.fillText('original', ox+shape[0][0]+3, oy+shape[0][1]-6);
+
+  const tPts = shape.map(([x,y]) => applyM(m, x, y));
+  ctx.beginPath();
+  ctx.moveTo(ox+tPts[0][0], oy+tPts[0][1]);
+  for(let i=1;i<tPts.length;i++) ctx.lineTo(ox+tPts[i][0], oy+tPts[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(78,203,164,0.15)';
+  ctx.fill();
+  ctx.strokeStyle = '#4ecba4';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#4ecba4'; ctx.font = '11px JetBrains Mono, monospace';
+  ctx.fillText('transformed', ox+tPts[0][0]+3, oy+tPts[0][1]-6);
+
+  ctx.fillStyle = 'rgba(155,141,255,0.7)';
+  ctx.beginPath(); ctx.arc(ox, oy, 4, 0, Math.PI*2); ctx.fill();
+
+  const center = applyM(m, 0, 0);
+  ctx.fillStyle = '#f0a94e';
+  ctx.beginPath(); ctx.arc(ox+center[0], oy+center[1], 5, 0, Math.PI*2); ctx.fill();
+}
+
+function updateMatrix() {
+  const v = getVals();
+  const m = buildMatrix(v);
+  document.getElementById('m00').textContent = m.a.toFixed(2);
+  document.getElementById('m01').textContent = m.b.toFixed(2);
+  document.getElementById('m02').textContent = Math.round(m.tx);
+  document.getElementById('m10').textContent = m.c.toFixed(2);
+  document.getElementById('m11').textContent = m.d.toFixed(2);
+  document.getElementById('m12').textContent = Math.round(m.ty);
+
+  const rotDeg = +document.getElementById('rot').value;
+  const shxVal = +document.getElementById('shx').value / 100;
+  let parts = [];
+  if(Math.abs(m.tx) > 0.5 || Math.abs(m.ty) > 0.5) parts.push('translate (' + Math.round(m.tx) + ', ' + Math.round(m.ty) + ') px');
+  if(Math.abs(rotDeg) > 0.5) parts.push('rotate ' + rotDeg + '°');
+  if(Math.abs(v.sx - 1) > 0.02 || Math.abs(v.sy - 1) > 0.02) parts.push('scale (' + v.sx.toFixed(2) + '×, ' + v.sy.toFixed(2) + '×)');
+  if(Math.abs(v.sx + 1) < 0.05) parts.push('flip X');
+  if(Math.abs(shxVal) > 0.01) parts.push('shear X by ' + shxVal.toFixed(2));
+  document.getElementById('desc').textContent = parts.length ? parts.join(' + ') : 'identity — no change applied';
+}
+
+function updateLabels() {
+  document.getElementById('txv').textContent  = document.getElementById('tx').value;
+  document.getElementById('tyv').textContent  = document.getElementById('ty').value;
+  document.getElementById('rotv').textContent = document.getElementById('rot').value + '°';
+  document.getElementById('sxv').textContent  = (+document.getElementById('sx').value/100).toFixed(2) + '×';
+  document.getElementById('syv').textContent  = (+document.getElementById('sy').value/100).toFixed(2) + '×';
+  document.getElementById('shxv').textContent = (+document.getElementById('shx').value/100).toFixed(2);
+}
+
+function update() { updateLabels(); updateMatrix(); draw(); }
+
+function setSlider(id, val) { document.getElementById(id).value = val; }
+
+function setPreset(name) {
+  const p = {
+    identity:  {tx:0,   ty:0,   rot:0,   sx:100,  sy:100,  shx:0},
+    translate: {tx:70,  ty:-50, rot:0,   sx:100,  sy:100,  shx:0},
+    rotate45:  {tx:0,   ty:0,   rot:45,  sx:100,  sy:100,  shx:0},
+    rotate90:  {tx:0,   ty:0,   rot:90,  sx:100,  sy:100,  shx:0},
+    scaleUp:   {tx:0,   ty:0,   rot:0,   sx:160,  sy:160,  shx:0},
+    flipX:     {tx:0,   ty:0,   rot:0,   sx:-100, sy:100,  shx:0},
+    shear:     {tx:0,   ty:0,   rot:0,   sx:100,  sy:100,  shx:60},
+    combo:     {tx:50,  ty:-30, rot:25,  sx:120,  sy:120,  shx:20},
+  }[name];
+  if(!p) return;
+  setSlider('tx',p.tx); setSlider('ty',p.ty); setSlider('rot',p.rot);
+  setSlider('sx',p.sx); setSlider('sy',p.sy); setSlider('shx',p.shx);
+  update();
+}
+
+window.addEventListener('resize', () => {
+  cv.width = cv.parentElement.offsetWidth;
+  draw();
+});
+
+update();
+</script>
+</body>
+</html>
