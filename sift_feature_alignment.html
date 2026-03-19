@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feature-Based Alignment & SIFT — Interactive Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --bg2: #131316;
+    --bg3: #1a1a1f;
+    --bg4: #222228;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e6e0;
+    --text2: #9a9890;
+    --text3: #5a5856;
+    --purple: #9b8dff;
+    --purple-dim: rgba(155,141,255,0.12);
+    --purple-border: rgba(155,141,255,0.3);
+    --teal: #4ecba4;
+    --teal-dim: rgba(78,203,164,0.12);
+    --teal-border: rgba(78,203,164,0.3);
+    --amber: #f0a94e;
+    --amber-dim: rgba(240,169,78,0.1);
+    --amber-border: rgba(240,169,78,0.3);
+    --coral: #ff7c6e;
+    --coral-dim: rgba(255,124,110,0.1);
+    --coral-border: rgba(255,124,110,0.3);
+    --gray-dim: rgba(255,255,255,0.05);
+    --gray-border: rgba(255,255,255,0.1);
+    --red: #ff6b6b;
+    --green: #4ecba4;
+    --radius: 8px;
+    --radius-lg: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+  }
+
+  .site-header { padding: 28px 40px 0; border-bottom: 1px solid var(--border); }
+  .header-top { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; }
+  .header-top h1 {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .header-top .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: .04em;
+  }
+
+  .tabs { display: flex; gap: 0; }
+  .tab {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text3);
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+    letter-spacing: .01em;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active { color: var(--text); border-bottom-color: var(--purple); }
+
+  .panel { display: none; padding: 32px 40px 48px; }
+  .panel.active { display: block; }
+
+  /* ── Stage stepper ── */
+  .stage-nav {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .stage-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: .03em;
+  }
+  .stage-btn:hover { border-color: var(--border2); color: var(--text2); }
+  .stage-btn.active { border-color: var(--purple-border); color: var(--purple); background: var(--purple-dim); }
+
+  .stage-panel { display: none; }
+  .stage-panel.active { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+
+  .canvas-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; }
+
+  .stage-desc {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .stage-desc-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .stage-desc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+  .stage-desc-name {
+    font-family: 'Instrument Serif', serif;
+    font-style: italic;
+    font-size: 17px;
+    color: var(--text);
+  }
+  .stage-desc-body {
+    padding: 14px 18px;
+    font-size: 13px;
+    line-height: 1.75;
+    color: var(--text2);
+  }
+  .stage-desc-body strong { color: var(--text); font-weight: 500; }
+  .stage-desc-body code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--purple);
+  }
+
+  .ctrl-section { padding: 14px 18px; border-top: 1px solid var(--border); }
+  .ctrl-section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .ctrl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .ctrl-row:last-child { margin-bottom: 0; }
+  .ctrl-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    width: 80px;
+    flex-shrink: 0;
+  }
+  .ctrl-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--purple);
+    width: 42px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--bg4);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--purple);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    background: var(--purple);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  /* ── Notes Tab ── */
+  .notes-layout { max-width: 760px; }
+  .note-section { margin-bottom: 48px; }
+  .note-section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .note-section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 3px 9px;
+    border-radius: 4px;
+  }
+  .note-section-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px;
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text);
+  }
+  .note-body { font-size: 15px; line-height: 1.8; color: var(--text2); font-weight: 300; }
+  .note-body p { margin-bottom: 14px; }
+  .note-body p:last-child { margin-bottom: 0; }
+  .note-body strong { color: var(--text); font-weight: 500; }
+  .note-body code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--purple);
+  }
+
+  .callout {
+    background: var(--purple-dim);
+    border: 1px solid var(--purple-border);
+    border-left: 3px solid var(--purple);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin: 18px 0;
+  }
+  .callout.teal { background: var(--teal-dim); border-color: var(--teal-border); border-left-color: var(--teal); }
+  .callout.amber { background: var(--amber-dim); border-color: var(--amber-border); border-left-color: var(--amber); }
+  .callout.coral { background: var(--coral-dim); border-color: var(--coral-border); border-left-color: var(--coral); }
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--purple);
+    margin-bottom: 7px;
+  }
+  .callout.teal .callout-label { color: var(--teal); }
+  .callout.amber .callout-label { color: var(--amber); }
+  .callout.coral .callout-label { color: var(--coral); }
+  .callout-body { font-size: 14px; line-height: 1.7; color: var(--text2); }
+
+  .math-block {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 16px 0;
+    color: var(--text);
+    line-height: 2;
+    overflow-x: auto;
+  }
+  .math-block .purple { color: var(--purple); }
+  .math-block .teal   { color: var(--teal); }
+  .math-block .amber  { color: var(--amber); }
+  .math-block .coral  { color: var(--coral); }
+  .math-block .dim    { color: var(--text3); }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; }
+  .summary-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+  }
+  .summary-card-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 8px;
+  }
+  .summary-card-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  .compare-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text3);
+    text-align: left;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .compare-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table td:first-child { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--purple); font-weight: 500; }
+
+  footer {
+    padding: 24px 40px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-top">
+    <h1>Feature-Based Alignment & SIFT</h1>
+    <span class="tag">BIOE 484 · Biomedical Image Computing</span>
+    <span class="tag">Interactive Reference</span>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('interactive', this)">Interactive</button>
+    <button class="tab" onclick="switchTab('notes', this)">Notes</button>
+  </nav>
+</header>
+
+<!-- ══ INTERACTIVE PANEL ══ -->
+<div id="panel-interactive" class="panel active">
+
+  <div class="stage-nav">
+    <button class="stage-btn active" onclick="setStage(0, this)">1 · Scale-space & DoG</button>
+    <button class="stage-btn" onclick="setStage(1, this)">2 · Extrema detection</button>
+    <button class="stage-btn" onclick="setStage(2, this)">3 · Keypoint filtering</button>
+    <button class="stage-btn" onclick="setStage(3, this)">4 · Orientation assignment</button>
+    <button class="stage-btn" onclick="setStage(4, this)">5 · SIFT descriptor</button>
+  </div>
+
+  <!-- Stage 0: Scale-space & DoG pyramid -->
+  <div class="stage-panel active" id="stage-0">
+    <div class="canvas-wrap">
+      <canvas id="cv0" height="400"></canvas>
+    </div>
+    <div class="stage-desc">
+      <div class="stage-desc-head">
+        <div class="stage-desc-title">Stage 01</div>
+        <div class="stage-desc-name">Scale-space & DoG pyramid</div>
+      </div>
+      <div class="stage-desc-body">
+        <p>The image is blurred repeatedly with a <strong>Gaussian kernel</strong> at increasing σ values, forming an <em>octave</em>. Each step blurs more — simulating what the image looks like from farther away.</p>
+        <p><strong>Difference of Gaussians (DoG)</strong> is computed by subtracting adjacent blurred images. This approximates the <strong>Laplacian of Gaussian</strong> (∇²G), a blob detector that responds strongly at edges and blobs at the right scale.</p>
+        <p>After one octave, the image is downsampled 2× and the process repeats — creating a <strong>pyramid of DoG images</strong> spanning many scales.</p>
+        <div style="margin-top:12px; padding:10px 12px; background:var(--bg3); border-radius:6px; border:1px solid var(--border);">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;margin-bottom:6px;">KEY FORMULA</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--amber);">DoG(x,y,σ) = G(x,y,kσ) − G(x,y,σ)</div>
+        </div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-section-title">Controls</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">octaves</span>
+          <input type="range" id="s0_oct" min="2" max="4" value="3" step="1" oninput="updateS0()">
+          <span class="ctrl-val" id="s0_octv">3</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">scales/oct</span>
+          <input type="range" id="s0_spo" min="3" max="5" value="4" step="1" oninput="updateS0()">
+          <span class="ctrl-val" id="s0_spov">4</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 1: Extrema detection -->
+  <div class="stage-panel" id="stage-1">
+    <div class="canvas-wrap">
+      <canvas id="cv1" height="400"></canvas>
+    </div>
+    <div class="stage-desc">
+      <div class="stage-desc-head">
+        <div class="stage-desc-title">Stage 02</div>
+        <div class="stage-desc-name">Scale-space extrema detection</div>
+      </div>
+      <div class="stage-desc-body">
+        <p>Each pixel in a DoG image is compared to its <strong>26 neighbors</strong> — 8 in the same scale layer, 9 in the layer above, 9 in the layer below.</p>
+        <p>A point is a candidate keypoint only if it is a <strong>local maximum or minimum</strong> across all 26 neighbors. This finds blobs that are distinctive in both space and scale simultaneously.</p>
+        <p>The resulting candidates are <em>tentative</em> — many will be discarded in the next stage. Only points that survive in both spatial position and across the scale axis are kept.</p>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-section-title">Controls</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">threshold</span>
+          <input type="range" id="s1_thresh" min="1" max="10" value="4" step="1" oninput="updateS1()">
+          <span class="ctrl-val" id="s1_threshv">4</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">show nbrs</span>
+          <input type="range" id="s1_show" min="0" max="1" value="1" step="1" oninput="updateS1()">
+          <span class="ctrl-val" id="s1_showv">on</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 2: Keypoint filtering -->
+  <div class="stage-panel" id="stage-2">
+    <div class="canvas-wrap">
+      <canvas id="cv2" height="400"></canvas>
+    </div>
+    <div class="stage-desc">
+      <div class="stage-desc-head">
+        <div class="stage-desc-title">Stage 03</div>
+        <div class="stage-desc-name">Keypoint localization & filtering</div>
+      </div>
+      <div class="stage-desc-body">
+        <p>Two rejection criteria remove unstable candidates:</p>
+        <p><strong>Low contrast rejection:</strong> A Taylor expansion fits a sub-pixel location. If the DoG value at the interpolated peak is below a threshold (~0.03), the point is discarded — it won't be stable under noise.</p>
+        <p><strong>Edge response rejection:</strong> The <strong>Hessian matrix</strong> at the keypoint describes local curvature. Edge points have one large curvature and one near-zero. The ratio of principal curvatures (like Harris) is checked — if it exceeds a threshold (r = 10), the point lies on an edge and is discarded.</p>
+        <p>What remains are well-localized, high-contrast, non-edge keypoints.</p>
+        <div style="margin-top:12px; padding:10px 12px; background:var(--bg3); border-radius:6px; border:1px solid var(--border);">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;margin-bottom:6px;">EDGE REJECTION</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--amber);">(Tr H)² / Det H &lt; (r+1)²/r</div>
+        </div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-section-title">Controls</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">contrast</span>
+          <input type="range" id="s2_c" min="1" max="10" value="5" step="1" oninput="updateS2()">
+          <span class="ctrl-val" id="s2_cv">5</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">edge ratio r</span>
+          <input type="range" id="s2_r" min="3" max="20" value="10" step="1" oninput="updateS2()">
+          <span class="ctrl-val" id="s2_rv">10</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 3: Orientation assignment -->
+  <div class="stage-panel" id="stage-3">
+    <div class="canvas-wrap">
+      <canvas id="cv3" height="400"></canvas>
+    </div>
+    <div class="stage-desc">
+      <div class="stage-desc-head">
+        <div class="stage-desc-title">Stage 04</div>
+        <div class="stage-desc-name">Orientation assignment</div>
+      </div>
+      <div class="stage-desc-body">
+        <p>For each keypoint, gradient magnitudes and orientations are computed in a <strong>neighborhood scaled to the keypoint's σ</strong>.</p>
+        <p>These are accumulated into a <strong>36-bin orientation histogram</strong> (10° per bin), weighted by gradient magnitude and a Gaussian centered on the keypoint.</p>
+        <p>The <strong>dominant orientation</strong> (histogram peak) becomes the keypoint's canonical orientation. Any other peak within <strong>80% of the dominant</strong> creates an additional keypoint at the same location — this is how SIFT handles multi-orientation patches.</p>
+        <p>This step is what makes SIFT <strong>rotation-invariant</strong>: all subsequent descriptor computation is done <em>relative to this assigned orientation</em>, so rotating the image just rotates the reference frame.</p>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-section-title">Controls</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">gradient σ</span>
+          <input type="range" id="s3_sig" min="1" max="8" value="3" step="1" oninput="updateS3()">
+          <span class="ctrl-val" id="s3_sigv">3</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">num bins</span>
+          <input type="range" id="s3_bins" min="8" max="36" value="36" step="4" oninput="updateS3()">
+          <span class="ctrl-val" id="s3_binsv">36</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 4: SIFT descriptor -->
+  <div class="stage-panel" id="stage-4">
+    <div class="canvas-wrap">
+      <canvas id="cv4" height="400"></canvas>
+    </div>
+    <div class="stage-desc">
+      <div class="stage-desc-head">
+        <div class="stage-desc-title">Stage 05</div>
+        <div class="stage-desc-name">SIFT keypoint descriptor</div>
+      </div>
+      <div class="stage-desc-body">
+        <p>A <strong>16×16 patch</strong> around the keypoint (aligned to assigned orientation) is divided into a <strong>4×4 grid of cells</strong>. In each cell, gradients are binned into an <strong>8-bin orientation histogram</strong>.</p>
+        <p>This yields <strong>4 × 4 × 8 = 128 values</strong> — the SIFT descriptor vector.</p>
+        <p>The vector is then <strong>L2-normalized</strong>, clamped at 0.2 (to reduce illumination sensitivity), and re-normalized. This makes the descriptor robust to linear illumination changes.</p>
+        <p>Matching is done by <strong>nearest-neighbor distance ratio</strong>: a match is accepted only if the closest descriptor distance is significantly smaller than the second-closest (Lowe's ratio test, threshold ≈ 0.8).</p>
+        <div style="margin-top:12px; padding:10px 12px; background:var(--bg3); border-radius:6px; border:1px solid var(--border);">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;margin-bottom:6px;">DESCRIPTOR SIZE</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--amber);">4×4 grid × 8 bins = 128-D vector</div>
+        </div>
+      </div>
+      <div class="ctrl-section">
+        <div class="ctrl-section-title">Controls</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">grid cells</span>
+          <input type="range" id="s4_cells" min="2" max="4" value="4" step="1" oninput="updateS4()">
+          <span class="ctrl-val" id="s4_cellsv">4×4</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">orient bins</span>
+          <input type="range" id="s4_bins" min="4" max="8" value="8" step="1" oninput="updateS4()">
+          <span class="ctrl-val" id="s4_binsv">8</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ NOTES PANEL ══ -->
+<div id="panel-notes" class="panel">
+  <div class="notes-layout">
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">01</span>
+        <span class="note-section-title">Feature-based alignment & intensity vectors</span>
+      </div>
+      <div class="note-body">
+        <p>Image alignment can be done two ways. <strong>Intensity-based (direct) methods</strong> compare raw pixel values across images and optimize a transform to minimize some difference metric — sum of squared differences, normalized cross-correlation, mutual information. These are simple but sensitive to intensity changes, occlusion, and they need a good initialization to avoid local optima.</p>
+        <p><strong>Feature-based methods</strong> first extract a sparse set of salient points from each image, then match those points across images, and finally estimate the transform from the matched correspondences. The key insight is that features can be made invariant to the very changes that break intensity methods.</p>
+
+        <div class="callout">
+          <div class="callout-label">Intensity vectors</div>
+          <div class="callout-body">An intensity vector is simply the raw pixel values in a patch around a point, stacked into a vector. It's the naive descriptor. The problem: shift the image by one pixel, rotate it slightly, or change the lighting, and the intensity vector changes completely even though the underlying structure is the same. Good feature descriptors are engineered to avoid this brittleness.</div>
+        </div>
+
+        <p>Feature-based alignment has three stages: <strong>detection</strong> (find the same physical point in both images), <strong>description</strong> (characterize the patch around each point in a stable way), and <strong>matching</strong> (pair up descriptors across images). The alignment transform is then estimated from the matched point pairs, typically with RANSAC to reject outlier matches.</p>
+
+        <div class="callout teal">
+          <div class="callout-label">In biomedical imaging</div>
+          <div class="callout-body">Feature-based alignment is used heavily in multi-modal registration (aligning MRI to CT), multi-stain alignment in pathology slides, and stitching tiled microscopy acquisitions. SIFT-derived methods appear in tools like elastix and ANTs for deformable registration pipelines.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">02</span>
+        <span class="note-section-title">SIFT overview — what it achieves</span>
+      </div>
+      <div class="note-body">
+        <p>Scale-Invariant Feature Transform (SIFT), introduced by Lowe (2004), detects and describes keypoints that are invariant to <strong>scale, rotation, and partially to illumination and affine distortion</strong>. It is the canonical feature descriptor in classical computer vision.</p>
+
+        <div class="summary-grid">
+          <div class="summary-card" style="border-color:var(--purple-border);">
+            <div class="summary-card-title" style="color:var(--purple);">Scale invariance</div>
+            <div class="summary-card-body">Achieved by detecting features in a scale-space pyramid. Each feature carries its own characteristic scale σ, so it is always described at the same relative scale regardless of image resolution.</div>
+          </div>
+          <div class="summary-card" style="border-color:var(--teal-border);">
+            <div class="summary-card-title" style="color:var(--teal);">Rotation invariance</div>
+            <div class="summary-card-body">Achieved by assigning a dominant gradient orientation to each keypoint and computing all descriptors relative to that orientation. Rotating the image just rotates the reference frame.</div>
+          </div>
+          <div class="summary-card" style="border-color:var(--amber-border);">
+            <div class="summary-card-title" style="color:var(--amber);">Illumination robustness</div>
+            <div class="summary-card-body">Gradient-based descriptors are naturally insensitive to additive illumination changes. L2 normalization + clamping handles multiplicative changes (contrast differences).</div>
+          </div>
+          <div class="summary-card" style="border-color:var(--coral-border);">
+            <div class="summary-card-title" style="color:var(--coral);">128-D descriptor</div>
+            <div class="summary-card-body">High-dimensional enough to be distinctive (low false-match rate) but compact enough for efficient nearest-neighbor matching. Lowe's ratio test further reduces false matches.</div>
+          </div>
+        </div>
+        <p>The full SIFT pipeline has four main stages: build the scale-space DoG pyramid → detect scale-space extrema → localize and filter keypoints → assign orientation and compute descriptor.</p>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">03</span>
+        <span class="note-section-title">Scale-space extrema detection</span>
+      </div>
+      <div class="note-body">
+        <p>The <strong>scale-space</strong> of an image L(x, y, σ) is defined as the convolution of the image I with a variable-scale Gaussian G(x, y, σ). Increasing σ progressively blurs the image, simulating viewing from increasing distance and suppressing fine details.</p>
+
+        <div class="math-block">
+<span class="dim">Scale-space:   </span><span class="teal">L(x,y,σ)</span> <span class="dim">=</span> <span class="purple">G(x,y,σ)</span> <span class="dim">★</span> <span class="teal">I(x,y)</span>
+
+<span class="dim">DoG:           </span><span class="amber">D(x,y,σ)</span> <span class="dim">=</span> <span class="teal">L(x,y,kσ)</span> <span class="dim">−</span> <span class="teal">L(x,y,σ)</span>
+
+<span class="dim">Approx:        </span><span class="amber">D(x,y,σ)</span> <span class="dim">≈ (k−1)σ²</span> <span class="purple">∇²G ★ I</span>
+        </div>
+
+        <p>The <strong>Difference of Gaussians (DoG)</strong> is a computationally efficient approximation of the scale-normalized Laplacian of Gaussian (LoG). The LoG is a theoretically optimal blob detector — the DoG gives the same scale-space extrema for much less computation since the blurred images are already computed.</p>
+
+        <p>Within each octave, <code>s+3</code> blurred images are generated (where s is the number of scales per octave), producing <code>s+2</code> DoG images. After one full octave, the image is downsampled by 2× using the already-blurred image at 2σ, and the process repeats. This multi-octave structure spans <strong>a large range of scales</strong> efficiently.</p>
+
+        <p>Extrema are found by checking each pixel against its <strong>26 neighbors</strong> (8 in-plane + 9 above + 9 below in scale). A point is a candidate keypoint if it is strictly greater or less than all 26 neighbors.</p>
+
+        <div class="callout amber">
+          <div class="callout-label">Why DoG instead of LoG?</div>
+          <div class="callout-body">The LoG requires a separate convolution at each scale. DoG reuses the already-computed Gaussian-blurred images — the blurred images are a byproduct of the pyramid construction, so subtraction costs almost nothing. At typical values of k ≈ √2, the DoG approximates the LoG within a small constant factor.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">04</span>
+        <span class="note-section-title">Keypoint localization & filtering</span>
+      </div>
+      <div class="note-body">
+        <p>The initial extrema are coarse — sampled at integer pixel positions on a discrete grid. Lowe improves this with a <strong>3D quadratic Taylor expansion</strong> of the DoG function around each candidate:</p>
+
+        <div class="math-block">
+<span class="teal">D(z)</span> <span class="dim">≈</span> <span class="teal">D</span> <span class="dim">+</span> <span class="purple">(∂D/∂z)ᵀ z</span> <span class="dim">+</span> <span class="amber">(1/2) zᵀ (∂²D/∂z²) z</span>
+
+<span class="dim">optimal offset:  </span><span class="coral">ẑ</span> <span class="dim">= −(∂²D/∂z²)⁻¹ (∂D/∂z)</span>
+        </div>
+
+        <p>If the offset <code>ẑ</code> exceeds 0.5 in any dimension, the extremum lies closer to a neighboring sample point and the candidate is moved there. This iterates until convergence or is discarded after too many steps.</p>
+
+        <p>Two rejection tests then run:</p>
+
+        <p><strong>Low contrast:</strong> The DoG value at the interpolated location is evaluated. If <code>|D(ẑ)| &lt; 0.03</code>, the point is discarded — low-contrast features are unstable under noise.</p>
+
+        <p><strong>Edge suppression via Hessian:</strong> DoG extrema on edges are poorly localized along the edge direction. The 2×2 Hessian H of the DoG at the keypoint captures principal curvatures. A large ratio of principal curvatures means the point is on an edge. If:</p>
+
+        <div class="math-block">
+<span class="dim">H = </span><span class="dim">[</span> <span class="purple">Dxx  Dxy</span> <span class="dim">]</span>
+    <span class="dim">[</span> <span class="purple">Dxy  Dyy</span> <span class="dim">]</span>
+
+<span class="amber">(Tr H)² / Det H</span> <span class="dim">&gt; (r+1)²/r</span>   <span class="dim">(r = 10 in original paper)</span>
+        </div>
+
+        <p>the keypoint is rejected as an edge point. This is essentially the same curvature ratio used in the Harris corner detector, applied here to the DoG response surface.</p>
+
+        <div class="callout teal">
+          <div class="callout-label">Why edges are problematic</div>
+          <div class="callout-body">On an edge, the DoG has a strong response in one direction (perpendicular to the edge) but is nearly flat along the edge. This means the location estimate has high uncertainty in the along-edge direction — the feature can slide along the edge freely. Such points are useless for alignment since you can't pin them down spatially.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">05</span>
+        <span class="note-section-title">Orientation assignment</span>
+      </div>
+      <div class="note-body">
+        <p>For each surviving keypoint at location (x, y) and scale σ, an orientation is assigned based on local image gradients. This is the step that makes SIFT <strong>rotation-invariant</strong>.</p>
+
+        <p>Gradient magnitude and orientation are computed at the keypoint's scale layer:</p>
+
+        <div class="math-block">
+<span class="teal">m(x,y)</span> <span class="dim">= √[(L(x+1,y)−L(x−1,y))² + (L(x,y+1)−L(x,y−1))²]</span>
+
+<span class="amber">θ(x,y)</span> <span class="dim">= atan2(L(x,y+1)−L(x,y−1),  L(x+1,y)−L(x−1,y))</span>
+        </div>
+
+        <p>An <strong>orientation histogram with 36 bins</strong> (10° each) is accumulated over a neighborhood of radius ~3σ. Each gradient vote is weighted by its magnitude and by a <strong>Gaussian falloff</strong> (σ = 1.5 × keypoint σ) centered at the keypoint — so nearby gradients matter more.</p>
+
+        <p>The dominant peak in the histogram becomes the keypoint's <strong>canonical orientation</strong>. A parabola is fit to the three bins around the peak for sub-bin precision. Any other local peak exceeding <strong>80% of the dominant peak</strong> generates an additional keypoint copy with that orientation — this handles corners and junctions where multiple orientations are present.</p>
+
+        <div class="callout">
+          <div class="callout-label">How rotation invariance works</div>
+          <div class="callout-body">All subsequent descriptor computation rotates the coordinate frame to align with this canonical orientation. So if the same physical patch appears at 0° in image A and 45° in image B, both produce descriptors in a frame aligned to their respective dominant gradient — the descriptors are identical.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">06</span>
+        <span class="note-section-title">SIFT keypoint descriptor</span>
+      </div>
+      <div class="note-body">
+        <p>Once a keypoint has a location (x, y), scale σ, and orientation θ, the descriptor is computed from a <strong>16×16 pixel neighborhood</strong> around the keypoint, rotated to the canonical orientation.</p>
+
+        <p>This patch is divided into a <strong>4×4 grid of 4×4 cells</strong>. Within each cell, gradient orientations (relative to the canonical orientation) are binned into an <strong>8-bin histogram</strong>, weighted by gradient magnitude and a Gaussian window.</p>
+
+        <div class="math-block">
+<span class="dim">Patch:       </span><span class="purple">16×16 pixels</span> <span class="dim">rotated to canonical orientation</span>
+<span class="dim">Grid:        </span><span class="teal">4×4</span> <span class="dim">spatial cells, each</span> <span class="teal">4×4</span> <span class="dim">pixels</span>
+<span class="dim">Histograms:  </span><span class="amber">8 orientation bins</span> <span class="dim">per cell</span>
+<span class="dim">Total:       </span><span class="coral">4 × 4 × 8 = 128 values</span>
+        </div>
+
+        <p>The 128-element vector is <strong>L2 normalized</strong>, then any values exceeding 0.2 are clamped (this reduces the influence of nonlinear illumination effects from specular reflections etc.), then the vector is <strong>re-normalized</strong>.</p>
+
+        <p><strong>Matching</strong> uses Euclidean distance between descriptors. Lowe's <strong>ratio test</strong> rejects ambiguous matches: a match is accepted only if:</p>
+
+        <div class="math-block">
+<span class="teal">d₁</span> <span class="dim">/</span> <span class="amber">d₂</span> <span class="dim">&lt; 0.8</span>
+
+<span class="dim">where d₁ = nearest neighbor distance</span>
+<span class="dim">      d₂ = second nearest neighbor distance</span>
+        </div>
+
+        <p>A ratio close to 1 means two descriptors are nearly equally good matches — ambiguous and likely wrong. Ratios well below 1 indicate a clearly dominant match.</p>
+
+        <div class="callout amber">
+          <div class="callout-label">Why 4×4 × 8 and not something else?</div>
+          <div class="callout-body">Lowe empirically tested many configurations. Larger grids (e.g. 8×8) capture more spatial structure but become sensitive to geometric distortion. More orientation bins add discriminability but also noise. The 4×4×8 = 128 configuration hit the sweet spot between distinctiveness, compactness, and stability under realistic image transformations.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-section">
+      <div class="note-section-header">
+        <span class="note-section-num">07</span>
+        <span class="note-section-title">Comparison to other scale-invariant detectors</span>
+      </div>
+      <div class="note-body">
+        <p>SIFT is not the only scale-invariant detector. Several alternatives trade different properties:</p>
+
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Detection</th>
+              <th>Descriptor</th>
+              <th>Speed</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SIFT</td>
+              <td>DoG extrema</td>
+              <td>128-D gradient histograms</td>
+              <td>Slow</td>
+              <td>Most thoroughly validated; was patented until 2020, now public domain</td>
+            </tr>
+            <tr>
+              <td>SURF</td>
+              <td>Hessian-based (box filters)</td>
+              <td>64-D Haar wavelet responses</td>
+              <td>~3× faster</td>
+              <td>Uses integral images for fast approximations; less accurate than SIFT on large viewpoint changes</td>
+            </tr>
+            <tr>
+              <td>ORB</td>
+              <td>FAST corners + Harris</td>
+              <td>256-bit binary (BRIEF variant)</td>
+              <td>Very fast</td>
+              <td>Real-time capable; binary descriptors matched with Hamming distance; less robust to scale changes</td>
+            </tr>
+            <tr>
+              <td>KAZE / AKAZE</td>
+              <td>Nonlinear scale-space extrema</td>
+              <td>M-LDB binary or float</td>
+              <td>Moderate</td>
+              <td>Scale-space built on nonlinear diffusion — better edge/boundary preservation than Gaussian blur</td>
+            </tr>
+            <tr>
+              <td>Harris-Laplace</td>
+              <td>Harris corners at Laplace scale</td>
+              <td>Varies (often SIFT-like)</td>
+              <td>Moderate</td>
+              <td>Detects corners specifically; scale selected at LoG extremum — good repeatability</td>
+            </tr>
+            <tr>
+              <td>SuperPoint</td>
+              <td>Learned (CNN)</td>
+              <td>256-D learned descriptor</td>
+              <td>GPU fast</td>
+              <td>Self-supervised deep learning approach; outperforms SIFT in many benchmarks; requires GPU</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="callout coral">
+          <div class="callout-label">SIFT in biomedical imaging specifically</div>
+          <div class="callout-body">Biomedical images often lack the rich texture that SIFT relies on (e.g. featureless tissue regions, repetitive cell patterns). Mutual information-based intensity methods are often preferred for mono-modal registration. SIFT is most useful in multi-modal or multi-stain scenarios where the image appearance changes significantly and intensity methods fail. Modified SIFT variants tuned for histology and fluorescence microscopy exist in the literature.</div>
+        </div>
+
+        <p>The key invariance properties to know for each:</p>
+        <ul style="padding-left:20px; line-height:2.2; color:var(--text2);">
+          <li><strong style="color:var(--purple);">SIFT / SURF:</strong> scale + rotation invariant, partial affine robustness</li>
+          <li><strong style="color:var(--teal);">ORB:</strong> rotation invariant, <em>not</em> scale invariant without explicit pyramid handling</li>
+          <li><strong style="color:var(--amber);">Harris (no scale):</strong> rotation invariant only — it was Harris's limitation that motivated scale-space extensions</li>
+          <li><strong style="color:var(--coral);">Learned (SuperPoint etc.):</strong> implicitly learn whatever invariances are in the training data — can generalize beyond hand-engineered invariances</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <span>sift_feature_alignment.html · BIOE 484</span>
+  <span>Frank Lato · UIUC · 2026</span>
+</footer>
+
+<script>
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function setStage(idx, btn) {
+  document.querySelectorAll('.stage-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('stage-' + idx).classList.add('active');
+  btn.classList.add('active');
+  [updateS0, updateS1, updateS2, updateS3, updateS4][idx]();
+}
+
+/* ─── SHARED UTILS ─── */
+function gaussianKernel(sigma, size) {
+  const k = [], half = Math.floor(size / 2);
+  let sum = 0;
+  for (let y = -half; y <= half; y++) {
+    const row = [];
+    for (let x = -half; x <= half; x++) {
+      const v = Math.exp(-(x*x + y*y) / (2*sigma*sigma));
+      row.push(v); sum += v;
+    }
+    k.push(row);
+  }
+  return k.map(r => r.map(v => v / sum));
+}
+
+function makeNoiseImage(W, H, seed) {
+  const data = new Float32Array(W * H);
+  let s = seed || 42;
+  function rand() { s = (s * 1664525 + 1013904223) & 0xffffffff; return ((s >>> 0) / 4294967296); }
+  // Create a blob-like synthetic image
+  const blobs = [
+    {x:0.2, y:0.3, r:0.12, v:0.9}, {x:0.6, y:0.2, r:0.09, v:0.7},
+    {x:0.75, y:0.65, r:0.14, v:0.85}, {x:0.35, y:0.7, r:0.10, v:0.75},
+    {x:0.5, y:0.45, r:0.07, v:0.6}, {x:0.15, y:0.6, r:0.08, v:0.5},
+    {x:0.85, y:0.3, r:0.11, v:0.8},
+  ];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let v = 0.08 + rand() * 0.06;
+      for (const b of blobs) {
+        const dx = x/W - b.x, dy = y/H - b.y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        v += b.v * Math.exp(-d*d / (2*b.r*b.r));
+      }
+      data[y * W + x] = Math.min(1, v);
+    }
+  }
+  return data;
+}
+
+function blurImage(data, W, H, sigma) {
+  const kernel = gaussianKernel(sigma, Math.max(3, Math.ceil(sigma * 3) * 2 + 1));
+  const half = Math.floor(kernel.length / 2);
+  const out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let sum = 0;
+      for (let ky = -half; ky <= half; ky++) {
+        for (let kx = -half; kx <= half; kx++) {
+          const sy = Math.min(H-1, Math.max(0, y+ky));
+          const sx = Math.min(W-1, Math.max(0, x+kx));
+          sum += kernel[ky+half][kx+half] * data[sy*W+sx];
+        }
+      }
+      out[y*W+x] = sum;
+    }
+  }
+  return out;
+}
+
+function drawImageData(ctx, data, W, H, x0, y0, drawW, drawH, colorFn) {
+  const imgData = ctx.createImageData(drawW, drawH);
+  for (let y = 0; y < drawH; y++) {
+    for (let x = 0; x < drawW; x++) {
+      const sx = Math.floor(x * W / drawW);
+      const sy = Math.floor(y * H / drawH);
+      const v = data[sy * W + sx];
+      const [r, g, b] = colorFn ? colorFn(v) : [v*255, v*255, v*255];
+      const idx = (y * drawW + x) * 4;
+      imgData.data[idx] = r; imgData.data[idx+1] = g;
+      imgData.data[idx+2] = b; imgData.data[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, x0, y0);
+}
+
+function dogColor(v) {
+  // v in [-1, 1], map to blue-black-amber
+  const norm = (v + 1) / 2;
+  if (norm < 0.5) {
+    const t = norm * 2;
+    return [Math.floor(t * 30), Math.floor(t * 40), Math.floor(80 + t * 100)];
+  } else {
+    const t = (norm - 0.5) * 2;
+    return [Math.floor(t * 240), Math.floor(t * 169), Math.floor(t * 78)];
+  }
+}
+
+/* ─── STAGE 0: Scale-space & DoG ─── */
+const cv0 = document.getElementById('cv0');
+const ctx0 = cv0.getContext('2d');
+
+function updateS0() {
+  const oct = +document.getElementById('s0_oct').value;
+  const spo = +document.getElementById('s0_spo').value;
+  document.getElementById('s0_octv').textContent = oct;
+  document.getElementById('s0_spov').textContent = spo;
+  drawS0(oct, spo);
+}
+
+function drawS0(numOct, spo) {
+  const W = cv0.parentElement.offsetWidth || 600;
+  cv0.width = W; cv0.height = 400;
+  ctx0.fillStyle = '#0d0d0f';
+  ctx0.fillRect(0, 0, W, 400);
+
+  const iW = 48, iH = 40;
+  const sigmas = [];
+  for (let s = 0; s < spo; s++) sigmas.push(1.0 * Math.pow(2, s / spo));
+
+  const startX = 24, startY = 30;
+  const padX = 14, padY = 20;
+  const colW = iW + padX;
+  const labelH = 18;
+
+  // Draw octave labels
+  for (let o = 0; o < numOct; o++) {
+    const yBase = startY + o * (iH + labelH + padY);
+    ctx0.fillStyle = 'rgba(155,141,255,0.5)';
+    ctx0.font = '9px JetBrains Mono, monospace';
+    ctx0.fillText('oct ' + (o+1), startX, yBase - 6);
+
+    const scale = Math.pow(0.5, o);
+    const rW = Math.max(12, Math.floor(iW * scale));
+    const rH = Math.max(10, Math.floor(iH * scale));
+
+    const baseData = makeNoiseImage(rW, rH, 42 + o * 7);
+
+    // Draw blurred images
+    for (let s = 0; s < spo; s++) {
+      const sigma = sigmas[s] * (o + 1) * 0.8;
+      const blurred = blurImage(baseData, rW, rH, sigma);
+      const x = startX + s * colW;
+      const y = yBase;
+
+      const rect = { x, y, w: iW, h: iH };
+      ctx0.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx0.lineWidth = 0.5;
+      ctx0.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      drawImageData(ctx0, blurred, rW, rH, rect.x, rect.y, rect.w, rect.h, null);
+
+      // sigma label
+      ctx0.fillStyle = 'rgba(78,203,164,0.8)';
+      ctx0.font = '8px JetBrains Mono, monospace';
+      ctx0.fillText('σ=' + sigma.toFixed(1), x, yBase + iH + 11);
+    }
+
+    // Draw DoG images (spo-1 of them)
+    const dogStartX = startX + spo * colW + 20;
+    ctx0.fillStyle = 'rgba(240,169,78,0.5)';
+    ctx0.font = '9px JetBrains Mono, monospace';
+    ctx0.fillText('DoG', dogStartX, yBase - 6);
+
+    for (let s = 0; s < spo - 1; s++) {
+      const s1 = sigmas[s] * (o+1) * 0.8;
+      const s2 = sigmas[s+1] * (o+1) * 0.8;
+      const b1 = blurImage(baseData, rW, rH, s1);
+      const b2 = blurImage(baseData, rW, rH, s2);
+      const dog = new Float32Array(rW * rH);
+      let mn = Infinity, mx = -Infinity;
+      for (let i = 0; i < dog.length; i++) {
+        dog[i] = b2[i] - b1[i];
+        mn = Math.min(mn, dog[i]); mx = Math.max(mx, dog[i]);
+      }
+      const range = mx - mn || 1;
+      const norm = dog.map(v => (v - mn) / range * 2 - 1);
+
+      const x = dogStartX + s * colW;
+      const y = yBase;
+      ctx0.strokeStyle = 'rgba(240,169,78,0.3)';
+      ctx0.lineWidth = 0.5;
+      ctx0.strokeRect(x, y, iW, iH);
+      drawImageData(ctx0, norm, rW, rH, x, y, iW, iH, dogColor);
+    }
+  }
+
+  // Arrow + label
+  ctx0.fillStyle = 'rgba(155,141,255,0.5)';
+  ctx0.font = '10px JetBrains Mono, monospace';
+  ctx0.fillText('→ 2× downsample between octaves', startX, 400 - 12);
+}
+
+updateS0();
+
+/* ─── STAGE 1: Extrema detection ─── */
+const cv1 = document.getElementById('cv1');
+const ctx1 = cv1.getContext('2d');
+let s1Kps = [];
+
+function updateS1() {
+  const thresh = +document.getElementById('s1_thresh').value;
+  const show = +document.getElementById('s1_show').value;
+  document.getElementById('s1_threshv').textContent = thresh;
+  document.getElementById('s1_showv').textContent = show ? 'on' : 'off';
+  drawS1(thresh, show);
+}
+
+function drawS1(thresh, showNbrs) {
+  const W = cv1.parentElement.offsetWidth || 600;
+  cv1.width = W; cv1.height = 400;
+  ctx1.fillStyle = '#0d0d0f';
+  ctx1.fillRect(0, 0, W, 400);
+
+  const imgW = 180, imgH = 160;
+  const base = makeNoiseImage(imgW, imgH, 99);
+  const b1 = blurImage(base, imgW, imgH, 1.2);
+  const b2 = blurImage(base, imgW, imgH, 1.8);
+  const b3 = blurImage(base, imgW, imgH, 2.5);
+  const dog1 = new Float32Array(imgW * imgH);
+  const dog2 = new Float32Array(imgW * imgH);
+  for (let i = 0; i < imgW * imgH; i++) {
+    dog1[i] = b2[i] - b1[i];
+    dog2[i] = b3[i] - b2[i];
+  }
+
+  // Normalize dogs for display
+  function normArr(arr) {
+    let mn = Infinity, mx = -Infinity;
+    for (const v of arr) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
+    const r = mx - mn || 1;
+    return arr.map(v => (v-mn)/r * 2 - 1);
+  }
+
+  const n1 = normArr(dog1), n2 = normArr(dog2);
+
+  const cx = Math.floor(W / 2);
+  const gap = 20;
+  const x1 = cx - imgW - gap / 2;
+  const x2 = cx + gap / 2;
+  const y0 = 24;
+
+  ctx1.font = '10px JetBrains Mono, monospace';
+  ctx1.fillStyle = 'rgba(240,169,78,0.7)';
+  ctx1.fillText('DoG layer below', x1, y0 - 4);
+  ctx1.fillText('DoG layer above', x2, y0 - 4);
+
+  drawImageData(ctx1, n1, imgW, imgH, x1, y0, imgW, imgH, dogColor);
+  drawImageData(ctx1, n2, imgW, imgH, x2, y0, imgW, imgH, dogColor);
+
+  ctx1.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx1.lineWidth = 0.5;
+  ctx1.strokeRect(x1, y0, imgW, imgH);
+  ctx1.strokeRect(x2, y0, imgW, imgH);
+
+  // Find extrema in center of dog1 compared to dog2
+  const candidates = [];
+  const threshVal = thresh * 0.015;
+  for (let y = 5; y < imgH - 5; y++) {
+    for (let x = 5; x < imgW - 5; x++) {
+      const v = dog1[y * imgW + x];
+      if (Math.abs(v) < threshVal) continue;
+      let isMax = true, isMin = true;
+      outer: for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const n1v = dog1[(y+dy)*imgW+(x+dx)];
+          const n2v = dog2[(y+dy)*imgW+(x+dx)];
+          if (v <= n1v || v <= n2v) isMax = false;
+          if (v >= n1v || v >= n2v) isMin = false;
+          if (!isMax && !isMin) break outer;
+        }
+      }
+      if (isMax || isMin) candidates.push({ x, y, isMax, v });
+    }
+  }
+  s1Kps = candidates;
+
+  // Draw neighbor grid on one candidate
+  if (showNbrs && candidates.length > 0) {
+    const kp = candidates[Math.floor(candidates.length / 2)];
+    const kpX = x1 + kp.x, kpY = y0 + kp.y;
+    const cellSize = 10;
+    const gridOff = -1;
+
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const gx = kpX + dx * cellSize - 5;
+        const gy = kpY + dy * cellSize - 5;
+        const isSelf = dx === 0 && dy === 0;
+        ctx1.fillStyle = isSelf ? 'rgba(240,169,78,0.35)' : 'rgba(155,141,255,0.15)';
+        ctx1.fillRect(gx, gy, cellSize, cellSize);
+        ctx1.strokeStyle = isSelf ? 'rgba(240,169,78,0.8)' : 'rgba(155,141,255,0.4)';
+        ctx1.lineWidth = 0.5;
+        ctx1.strokeRect(gx, gy, cellSize, cellSize);
+      }
+    }
+    // Same on second layer
+    const kpX2 = x2 + kp.x, kpY2 = y0 + kp.y;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const gx = kpX2 + dx * cellSize - 5;
+        const gy = kpY2 + dy * cellSize - 5;
+        ctx1.fillStyle = 'rgba(155,141,255,0.15)';
+        ctx1.fillRect(gx, gy, cellSize, cellSize);
+        ctx1.strokeStyle = 'rgba(155,141,255,0.4)';
+        ctx1.lineWidth = 0.5;
+        ctx1.strokeRect(gx, gy, cellSize, cellSize);
+      }
+    }
+
+    ctx1.strokeStyle = 'rgba(155,141,255,0.4)';
+    ctx1.lineWidth = 0.5;
+    ctx1.setLineDash([3,3]);
+    ctx1.beginPath();
+    ctx1.moveTo(kpX + 5, kpY + 5);
+    ctx1.lineTo(kpX2 - 5, kpY2 + 5);
+    ctx1.stroke();
+    ctx1.setLineDash([]);
+
+    ctx1.fillStyle = 'rgba(155,141,255,0.6)';
+    ctx1.font = '10px JetBrains Mono, monospace';
+    ctx1.fillText('26-neighbor comparison (8+9+9)', x1, y0 + imgH + 18);
+  }
+
+  // Draw all keypoints
+  for (const kp of candidates) {
+    ctx1.beginPath();
+    ctx1.arc(x1 + kp.x, y0 + kp.y, 3.5, 0, Math.PI * 2);
+    ctx1.fillStyle = kp.isMax ? 'rgba(78,203,164,0.8)' : 'rgba(255,124,110,0.8)';
+    ctx1.fill();
+  }
+
+  ctx1.fillStyle = 'rgba(78,203,164,0.7)';
+  ctx1.font = '10px JetBrains Mono, monospace';
+  ctx1.fillText('maxima (' + candidates.filter(k=>k.isMax).length + ')', x1, y0 + imgH + 36);
+  ctx1.fillStyle = 'rgba(255,124,110,0.7)';
+  ctx1.fillText('minima (' + candidates.filter(k=>!k.isMax).length + ')', x1 + 110, y0 + imgH + 36);
+
+  ctx1.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx1.font = '10px JetBrains Mono, monospace';
+  ctx1.fillText('threshold: ' + thresh, x1, y0 + imgH + 54);
+}
+
+updateS1();
+
+/* ─── STAGE 2: Filtering ─── */
+const cv2 = document.getElementById('cv2');
+const ctx2 = cv2.getContext('2d');
+
+function updateS2() {
+  const c = +document.getElementById('s2_c').value;
+  const r = +document.getElementById('s2_r').value;
+  document.getElementById('s2_cv').textContent = c;
+  document.getElementById('s2_rv').textContent = r;
+  drawS2(c, r);
+}
+
+function drawS2(contrast, edgeR) {
+  const W = cv2.parentElement.offsetWidth || 600;
+  cv2.width = W; cv2.height = 400;
+  ctx2.fillStyle = '#0d0d0f';
+  ctx2.fillRect(0, 0, W, 400);
+
+  const imgW = 220, imgH = 180;
+  const x0 = Math.floor((W - imgW) / 2), y0 = 28;
+
+  const base = makeNoiseImage(imgW, imgH, 77);
+  const b1 = blurImage(base, imgW, imgH, 1.4);
+  const b2 = blurImage(base, imgW, imgH, 2.0);
+  const dog = new Float32Array(imgW * imgH);
+  for (let i = 0; i < imgW * imgH; i++) dog[i] = b2[i] - b1[i];
+
+  let mn = Infinity, mx = -Infinity;
+  for (const v of dog) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
+  const range = mx - mn || 1;
+  const normDog = dog.map(v => (v-mn)/range * 2 - 1);
+
+  drawImageData(ctx2, normDog, imgW, imgH, x0, y0, imgW, imgH, dogColor);
+  ctx2.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx2.lineWidth = 0.5;
+  ctx2.strokeRect(x0, y0, imgW, imgH);
+
+  ctx2.fillStyle = 'rgba(240,169,78,0.6)';
+  ctx2.font = '10px JetBrains Mono, monospace';
+  ctx2.fillText('DoG response', x0, y0 - 6);
+
+  // Generate candidates and filter them
+  const contrastThresh = contrast * 0.008;
+  const total = [], kept = [], rejContrast = [], rejEdge = [];
+
+  for (let y = 3; y < imgH - 3; y += 2) {
+    for (let x = 3; x < imgW - 3; x += 2) {
+      const v = dog[y * imgW + x];
+      total.push({x, y, v});
+      const absV = Math.abs(v);
+      if (absV < contrastThresh) { rejContrast.push({x,y}); continue; }
+
+      // Simple Hessian from dog values
+      const dxx = dog[y*imgW+(x+1)] - 2*v + dog[y*imgW+(x-1)];
+      const dyy = dog[(y+1)*imgW+x] - 2*v + dog[(y-1)*imgW+x];
+      const dxy = (dog[(y+1)*imgW+(x+1)] - dog[(y+1)*imgW+(x-1)] - dog[(y-1)*imgW+(x+1)] + dog[(y-1)*imgW+(x-1)]) / 4;
+      const tr = dxx + dyy;
+      const det = dxx * dyy - dxy * dxy;
+      if (det <= 0 || (tr*tr/det) > ((edgeR+1)*(edgeR+1)/edgeR)) {
+        rejEdge.push({x,y}); continue;
+      }
+      kept.push({x,y});
+    }
+  }
+
+  // Draw points
+  for (const p of rejContrast) {
+    ctx2.beginPath();
+    ctx2.arc(x0+p.x, y0+p.y, 2, 0, Math.PI*2);
+    ctx2.fillStyle = 'rgba(255,107,107,0.35)';
+    ctx2.fill();
+  }
+  for (const p of rejEdge) {
+    ctx2.beginPath();
+    ctx2.arc(x0+p.x, y0+p.y, 2, 0, Math.PI*2);
+    ctx2.fillStyle = 'rgba(240,169,78,0.4)';
+    ctx2.fill();
+  }
+  for (const p of kept) {
+    ctx2.beginPath();
+    ctx2.arc(x0+p.x, y0+p.y, 3, 0, Math.PI*2);
+    ctx2.fillStyle = 'rgba(78,203,164,0.9)';
+    ctx2.fill();
+  }
+
+  // Legend
+  const ly = y0 + imgH + 20;
+  const items = [
+    { color: 'rgba(78,203,164,0.9)',  label: 'kept (' + kept.length + ')' },
+    { color: 'rgba(255,107,107,0.6)', label: 'low contrast (' + rejContrast.length + ')' },
+    { color: 'rgba(240,169,78,0.7)',  label: 'edge rejected (' + rejEdge.length + ')' },
+  ];
+  let lx = x0;
+  for (const item of items) {
+    ctx2.beginPath();
+    ctx2.arc(lx + 5, ly, 4, 0, Math.PI*2);
+    ctx2.fillStyle = item.color;
+    ctx2.fill();
+    ctx2.fillStyle = 'rgba(154,152,144,0.9)';
+    ctx2.font = '10px JetBrains Mono, monospace';
+    ctx2.fillText(item.label, lx + 13, ly + 4);
+    lx += ctx2.measureText(item.label).width + 28;
+  }
+}
+
+updateS2();
+
+/* ─── STAGE 3: Orientation histogram ─── */
+const cv3 = document.getElementById('cv3');
+const ctx3 = cv3.getContext('2d');
+
+function updateS3() {
+  const sig = +document.getElementById('s3_sig').value;
+  const bins = +document.getElementById('s3_bins').value;
+  document.getElementById('s3_sigv').textContent = sig;
+  document.getElementById('s3_binsv').textContent = bins;
+  drawS3(sig, bins);
+}
+
+function drawS3(sigma, numBins) {
+  const W = cv3.parentElement.offsetWidth || 600;
+  cv3.width = W; cv3.height = 400;
+  ctx3.fillStyle = '#0d0d0f';
+  ctx3.fillRect(0, 0, W, 400);
+
+  // Draw patch with synthetic gradients
+  const patchSize = 120;
+  const px = 30, py = 50;
+
+  // Synthetic gradient field
+  const gradients = [];
+  const angleBase = Math.PI * 0.4;
+  for (let gy = 0; gy < 8; gy++) {
+    for (let gx = 0; gx < 8; gx++) {
+      const fx = gx / 8, fy = gy / 8;
+      const angle = angleBase + Math.sin(fx * Math.PI * 2) * 0.4 + Math.cos(fy * Math.PI) * 0.3 + (Math.random() - 0.5) * 0.5;
+      const mag = 0.3 + 0.7 * Math.exp(-((fx-0.5)*(fx-0.5)+(fy-0.5)*(fy-0.5)) * 4);
+      gradients.push({ x: px + gx * (patchSize/8) + 8, y: py + gy * (patchSize/8) + 8, angle, mag });
+    }
+  }
+
+  // Draw patch bg
+  ctx3.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx3.fillRect(px, py, patchSize, patchSize);
+  ctx3.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx3.lineWidth = 0.5;
+  ctx3.strokeRect(px, py, patchSize, patchSize);
+
+  // Gaussian weight circle
+  ctx3.strokeStyle = 'rgba(78,203,164,0.25)';
+  ctx3.lineWidth = 1;
+  ctx3.setLineDash([3, 3]);
+  ctx3.beginPath();
+  ctx3.arc(px + patchSize/2, py + patchSize/2, sigma * 10, 0, Math.PI * 2);
+  ctx3.stroke();
+  ctx3.setLineDash([]);
+
+  // Draw gradient arrows
+  for (const g of gradients) {
+    const len = g.mag * 12;
+    const weight = Math.exp(-((g.x-px-patchSize/2)**2 + (g.y-py-patchSize/2)**2) / (2*(sigma*10)**2));
+    const alpha = 0.3 + weight * 0.6;
+    ctx3.strokeStyle = `rgba(240,169,78,${alpha})`;
+    ctx3.lineWidth = 0.8 + weight;
+    ctx3.beginPath();
+    ctx3.moveTo(g.x, g.y);
+    ctx3.lineTo(g.x + Math.cos(g.angle) * len, g.y + Math.sin(g.angle) * len);
+    ctx3.stroke();
+  }
+
+  // Keypoint dot
+  ctx3.fillStyle = 'rgba(155,141,255,1)';
+  ctx3.beginPath();
+  ctx3.arc(px + patchSize/2, py + patchSize/2, 5, 0, Math.PI * 2);
+  ctx3.fill();
+
+  ctx3.fillStyle = 'rgba(155,141,255,0.5)';
+  ctx3.font = '10px JetBrains Mono, monospace';
+  ctx3.fillText('keypoint neighborhood (σ=' + sigma + ')', px, py - 8);
+
+  // Build histogram
+  const hist = new Array(numBins).fill(0);
+  for (const g of gradients) {
+    const weight = Math.exp(-((g.x-px-patchSize/2)**2 + (g.y-py-patchSize/2)**2) / (2*(sigma*10)**2));
+    let binIdx = Math.floor(((g.angle % (Math.PI*2) + Math.PI*2) % (Math.PI*2)) / (Math.PI*2) * numBins);
+    if (binIdx >= numBins) binIdx = numBins - 1;
+    hist[binIdx] += g.mag * weight;
+  }
+  const maxHist = Math.max(...hist);
+
+  // Draw histogram as polar plot
+  const hx = px + patchSize + 60, hy = py + patchSize/2, hr = 80;
+  ctx3.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx3.lineWidth = 0.5;
+  for (let r = hr/3; r <= hr; r += hr/3) {
+    ctx3.beginPath(); ctx3.arc(hx, hy, r, 0, Math.PI*2); ctx3.stroke();
+  }
+  for (let b = 0; b < numBins; b++) {
+    const a = (b / numBins) * Math.PI * 2;
+    ctx3.beginPath();
+    ctx3.moveTo(hx, hy);
+    ctx3.lineTo(hx + Math.cos(a) * hr, hy + Math.sin(a) * hr);
+    ctx3.stroke();
+  }
+
+  // Fill histogram bars
+  for (let b = 0; b < numBins; b++) {
+    const a1 = (b / numBins) * Math.PI * 2;
+    const a2 = ((b+1) / numBins) * Math.PI * 2;
+    const r = (hist[b] / maxHist) * hr;
+    const isPeak = hist[b] === maxHist;
+    const is80 = hist[b] >= maxHist * 0.8 && !isPeak;
+
+    ctx3.beginPath();
+    ctx3.moveTo(hx, hy);
+    ctx3.arc(hx, hy, r, a1, a2);
+    ctx3.closePath();
+    ctx3.fillStyle = isPeak ? 'rgba(155,141,255,0.75)' : is80 ? 'rgba(240,169,78,0.5)' : 'rgba(78,203,164,0.25)';
+    ctx3.fill();
+    ctx3.strokeStyle = isPeak ? 'rgba(155,141,255,0.9)' : 'rgba(255,255,255,0.08)';
+    ctx3.lineWidth = 0.5;
+    ctx3.stroke();
+  }
+
+  // Dominant orientation arrow
+  const peakBin = hist.indexOf(maxHist);
+  const peakAngle = (peakBin + 0.5) / numBins * Math.PI * 2;
+  ctx3.strokeStyle = 'rgba(155,141,255,0.95)';
+  ctx3.lineWidth = 2;
+  ctx3.beginPath();
+  ctx3.moveTo(hx, hy);
+  ctx3.lineTo(hx + Math.cos(peakAngle) * (hr + 14), hy + Math.sin(peakAngle) * (hr + 14));
+  ctx3.stroke();
+  ctx3.beginPath();
+  ctx3.arc(hx + Math.cos(peakAngle) * (hr + 14), hy + Math.sin(peakAngle) * (hr + 14), 4, 0, Math.PI*2);
+  ctx3.fillStyle = 'rgba(155,141,255,0.9)';
+  ctx3.fill();
+
+  ctx3.fillStyle = 'rgba(155,141,255,0.6)';
+  ctx3.font = '10px JetBrains Mono, monospace';
+  ctx3.fillText(numBins + '-bin orientation histogram', hx - 50, py - 8);
+  ctx3.fillStyle = 'rgba(155,141,255,0.8)';
+  ctx3.fillText('dominant orientation', hx - 40, hy + hr + 20);
+  ctx3.fillStyle = 'rgba(240,169,78,0.7)';
+  ctx3.fillText('≥80% of peak → extra keypoint', hx - 40, hy + hr + 34);
+}
+
+updateS3();
+
+/* ─── STAGE 4: SIFT descriptor ─── */
+const cv4 = document.getElementById('cv4');
+const ctx4 = cv4.getContext('2d');
+
+function updateS4() {
+  const cells = +document.getElementById('s4_cells').value;
+  const bins = +document.getElementById('s4_bins').value;
+  document.getElementById('s4_cellsv').textContent = cells + '×' + cells;
+  document.getElementById('s4_binsv').textContent = bins;
+  drawS4(cells, bins);
+}
+
+function drawS4(numCells, numBins) {
+  const W = cv4.parentElement.offsetWidth || 600;
+  cv4.width = W; cv4.height = 400;
+  ctx4.fillStyle = '#0d0d0f';
+  ctx4.fillRect(0, 0, W, 400);
+
+  const patchSize = 160;
+  const px = 24, py = 40;
+  const cellSize = patchSize / numCells;
+
+  // Draw cells
+  for (let cy = 0; cy < numCells; cy++) {
+    for (let cx = 0; cx < numCells; cx++) {
+      const x = px + cx * cellSize, y = py + cy * cellSize;
+      const highlight = cx === 1 && cy === 1;
+      ctx4.fillStyle = highlight ? 'rgba(155,141,255,0.12)' : 'rgba(255,255,255,0.03)';
+      ctx4.fillRect(x, y, cellSize, cellSize);
+      ctx4.strokeStyle = highlight ? 'rgba(155,141,255,0.5)' : 'rgba(255,255,255,0.1)';
+      ctx4.lineWidth = highlight ? 1 : 0.5;
+      ctx4.strokeRect(x, y, cellSize, cellSize);
+
+      // Mini gradient arrows in each cell
+      const gradPerCell = 3;
+      for (let gy = 0; gy < gradPerCell; gy++) {
+        for (let gx = 0; gx < gradPerCell; gx++) {
+          const gxPos = x + (gx + 0.5) * cellSize / gradPerCell;
+          const gyPos = y + (gy + 0.5) * cellSize / gradPerCell;
+          const angle = ((cx * numCells + cy) * 0.7 + gx * 0.4 + gy * 0.5) % (Math.PI * 2);
+          const len = 4 + Math.sin(cx + cy + gx) * 2;
+          ctx4.strokeStyle = 'rgba(240,169,78,0.5)';
+          ctx4.lineWidth = 0.8;
+          ctx4.beginPath();
+          ctx4.moveTo(gxPos, gyPos);
+          ctx4.lineTo(gxPos + Math.cos(angle) * len, gyPos + Math.sin(angle) * len);
+          ctx4.stroke();
+        }
+      }
+    }
+  }
+
+  // Labels
+  ctx4.fillStyle = 'rgba(155,141,255,0.6)';
+  ctx4.font = '10px JetBrains Mono, monospace';
+  ctx4.fillText(numCells + '×' + numCells + ' spatial grid', px, py - 8);
+
+  ctx4.strokeStyle = 'rgba(78,203,164,0.6)';
+  ctx4.lineWidth = 1.5;
+  ctx4.strokeRect(px, py, patchSize, patchSize);
+
+  // Descriptor visualization on right
+  const descW = W - px - patchSize - 50;
+  const descX = px + patchSize + 30;
+  const descY = py;
+  const total = numCells * numCells * numBins;
+
+  ctx4.fillStyle = 'rgba(78,203,164,0.6)';
+  ctx4.font = '10px JetBrains Mono, monospace';
+  ctx4.fillText(numCells + '×' + numCells + ' × ' + numBins + 'bins = ' + total + '-D descriptor', descX, descY - 8);
+
+  // Draw descriptor as a 1D bar chart (simplified)
+  const barH = 6;
+  const barGap = 2;
+  const maxBars = Math.min(total, Math.floor((patchSize) / (barH + barGap)));
+  const visTotal = maxBars;
+
+  for (let i = 0; i < visTotal; i++) {
+    const cellIdx = Math.floor(i / numBins);
+    const binIdx = i % numBins;
+    const cy2 = Math.floor(cellIdx / numCells);
+    const cx2 = cellIdx % numCells;
+    const pseudoVal = 0.2 + 0.7 * Math.abs(Math.sin(i * 1.7 + cx2 * 2.3 + cy2 * 1.1));
+    const barW = pseudoVal * (descW - 20);
+    const y = descY + i * (barH + barGap);
+
+    const groupAlpha = (cx2 === 1 && cy2 === 1) ? 0.9 : 0.4;
+    const hue = (cellIdx / (numCells * numCells)) * 360;
+    ctx4.fillStyle = `hsla(${hue}, 60%, 65%, ${groupAlpha})`;
+    ctx4.fillRect(descX, y, barW, barH);
+  }
+
+  if (total > visTotal) {
+    ctx4.fillStyle = 'rgba(90,88,86,0.7)';
+    ctx4.font = '10px JetBrains Mono, monospace';
+    ctx4.fillText('... ' + (total - visTotal) + ' more values', descX, descY + visTotal * (barH + barGap) + 12);
+  }
+
+  // Normalization reminder
+  const ny = py + patchSize + 20;
+  ctx4.fillStyle = 'rgba(240,169,78,0.7)';
+  ctx4.font = '10px JetBrains Mono, monospace';
+  ctx4.fillText('→ L2 normalize  →  clamp at 0.2  →  re-normalize', px, ny);
+  ctx4.fillStyle = 'rgba(78,203,164,0.6)';
+  ctx4.fillText('→ match with Lowe ratio test (d₁/d₂ < 0.8)', px, ny + 16);
+}
+
+updateS4();
+
+/* ─── Resize handler ─── */
+window.addEventListener('resize', () => {
+  updateS0(); updateS1(); updateS2(); updateS3(); updateS4();
+});
+</script>
+</body>
+</html>
