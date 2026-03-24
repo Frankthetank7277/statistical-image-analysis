@@ -34,9 +34,10 @@
     color: var(--text);
     font-family: 'DM Sans', sans-serif;
     font-weight: 300;
+    font-size: 18px;           /* base bump */
     min-height: 100vh;
-    padding: 48px 40px 80px;
-    max-width: 760px;
+    padding: 52px 44px 88px;
+    max-width: 820px;
     margin: 0 auto;
     position: relative;
     overflow-x: hidden;
@@ -69,8 +70,8 @@
     position: relative;
     z-index: 1;
     width: 100%;
-    height: 90px;
-    margin-bottom: 36px;
+    height: 96px;              /* was 90px */
+    margin-bottom: 40px;
     border-radius: 6px;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -83,23 +84,23 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 40px;
+    margin-bottom: 44px;
   }
 
-  .meta-left { display: flex; flex-direction: column; gap: 4px; }
+  .meta-left { display: flex; flex-direction: column; gap: 5px; }
 
   .institution {
     font-family: 'DM Mono', monospace;
-    font-size: 10px;
+    font-size: 12px;           /* was 10px */
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--text-dim);
-    margin-bottom: 6px;
+    margin-bottom: 7px;
   }
 
   h1 {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(32px, 6vw, 58px);
+    font-size: clamp(36px, 6vw, 64px);   /* was clamp(32px, 6vw, 58px) */
     font-weight: 400;
     letter-spacing: 0.06em;
     line-height: 1.0;
@@ -111,13 +112,13 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 6px;
-    padding-top: 4px;
+    gap: 7px;
+    padding-top: 5px;
   }
 
   .meta-tag {
     font-family: 'DM Mono', monospace;
-    font-size: 10px;
+    font-size: 12px;           /* was 10px */
     color: var(--text-dim);
     letter-spacing: 0.1em;
   }
@@ -127,7 +128,7 @@
     position: relative;
     z-index: 1;
     display: flex;
-    margin-bottom: 36px;
+    margin-bottom: 40px;
     border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
@@ -136,24 +137,24 @@
 
   .info-cell {
     flex: 1;
-    padding: 10px 16px;
+    padding: 12px 18px;        /* was 10px 16px */
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
   }
   .info-cell:last-child { border-right: none; }
 
   .info-label {
     font-family: 'DM Mono', monospace;
-    font-size: 8px;
+    font-size: 10px;           /* was 8px */
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--text-dim);
   }
   .info-value {
     font-family: 'DM Mono', monospace;
-    font-size: 12px;
+    font-size: 14px;           /* was 12px */
     color: var(--cyan);
   }
 
@@ -163,11 +164,11 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
   }
   .section-header .label {
     font-family: 'DM Mono', monospace;
-    font-size: 9px;
+    font-size: 11px;           /* was 9px */
     letter-spacing: 0.3em;
     text-transform: uppercase;
     color: var(--text-dim);
@@ -186,7 +187,7 @@
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 9px;
   }
 
   .module-item a {
@@ -196,7 +197,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 18px 20px;
+    padding: 20px 22px;        /* was 18px 20px */
     text-decoration: none;
     color: var(--text);
     transition: border-color 0.2s, background 0.2s, transform 0.15s;
@@ -235,7 +236,7 @@
   .module-left {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 18px;
     position: relative;
     z-index: 1;
     flex: 1;
@@ -244,17 +245,17 @@
 
   .module-index {
     font-family: 'DM Mono', monospace;
-    font-size: 11px;
+    font-size: 13px;           /* was 11px */
     color: var(--text-dim);
-    min-width: 20px;
+    min-width: 24px;
     flex-shrink: 0;
   }
 
-  .module-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .module-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
   .module-name {
     font-family: 'DM Sans', sans-serif;
-    font-size: 14px;
+    font-size: 16px;           /* was 14px */
     font-weight: 500;
     color: var(--text);
     white-space: nowrap;
@@ -263,7 +264,7 @@
   }
 
   .module-desc {
-    font-size: 11px;
+    font-size: 13px;           /* was 11px */
     color: var(--text-mid);
     font-family: 'DM Mono', monospace;
     font-weight: 300;
@@ -280,10 +281,10 @@
 
   .module-tag {
     font-family: 'DM Mono', monospace;
-    font-size: 9px;
+    font-size: 11px;           /* was 9px */
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    padding: 3px 8px;
+    padding: 4px 10px;         /* was 3px 8px */
     border-radius: 3px;
     border: 1px solid var(--border);
     color: var(--text-dim);
@@ -291,7 +292,7 @@
   }
 
   .module-arrow {
-    font-size: 13px;
+    font-size: 15px;           /* was 13px */
     color: var(--blue);
     opacity: 0.6;
     transition: opacity 0.2s, transform 0.2s;
@@ -301,8 +302,8 @@
   .footer {
     position: relative;
     z-index: 1;
-    margin-top: 52px;
-    padding-top: 16px;
+    margin-top: 56px;
+    padding-top: 18px;
     border-top: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
@@ -310,7 +311,7 @@
   }
   .footer-text {
     font-family: 'DM Mono', monospace;
-    font-size: 9px;
+    font-size: 11px;           /* was 9px */
     color: var(--text-dim);
     letter-spacing: 0.12em;
   }
@@ -567,7 +568,7 @@
       <div class="module-left">
         <span class="module-index">12</span>
         <div class="module-info">
-          <div class="module-name">Feature-Based Alignment & SIFT</div>
+          <div class="module-name">Feature-Based Alignment &amp; SIFT</div>
           <div class="module-desc">intensity vectors · DoG pyramid · extrema · keypoint filtering · orientation · 128-D descriptor</div>
         </div>
       </div>
