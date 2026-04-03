@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 17–18 · Image Segmentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #07080f;
+    --surface: #0c0e18;
+    --surface2: #111422;
+    --border: #1a1e35;
+    --border-bright: #2a3060;
+    --blue: #4a9eff;
+    --blue-dim: #1a3a6e;
+    --blue-glow: rgba(74,158,255,0.12);
+    --cyan: #7de8f5;
+    --cyan-dim: rgba(125,232,245,0.15);
+    --text: #cdd6f4;
+    --text-dim: #4a5280;
+    --text-mid: #7a84b0;
+    --green: #a6e3a1;
+    --red: #f38ba8;
+    --yellow: #f9e2af;
+    --mauve: #cba6f7;
+    --peach: #fab387;
+    --teal: #94e2d5;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    font-size: 15px;
+    min-height: 100vh;
+    padding: 52px 44px 88px;
+    max-width: 900px;
+    margin: 0 auto;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -20%; left: 50%;
+    transform: translateX(-50%);
+    width: 800px; height: 600px;
+    background: radial-gradient(ellipse, rgba(74,158,255,0.06) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, rgba(74,158,255,0.08) 1px, transparent 1px);
+    background-size: 28px 28px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── SCAN HEADER ── */
+  .scan-header {
+    position: relative; z-index: 1;
+    width: 100%; height: 96px;
+    margin-bottom: 40px;
+    border-radius: 6px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  #scanCanvas { display: block; width: 100%; height: 100%; }
+
+  /* ── META ── */
+  .meta-strip {
+    position: relative; z-index: 1;
+    display: flex; align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 44px;
+  }
+  .meta-left { display: flex; flex-direction: column; gap: 5px; }
+  .institution {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 7px;
+  }
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(36px,6vw,64px); font-weight: 400;
+    letter-spacing: 0.06em; line-height: 1.0; color: var(--text);
+  }
+  h1 span { color: var(--blue); }
+  .meta-right {
+    display: flex; flex-direction: column;
+    align-items: flex-end; gap: 7px; padding-top: 5px;
+  }
+  .meta-tag {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--text-dim); letter-spacing: 0.1em;
+  }
+  .meta-tag span { color: var(--cyan); }
+
+  /* ── INFO BAR ── */
+  .info-bar {
+    position: relative; z-index: 1;
+    display: flex; margin-bottom: 40px;
+    border: 1px solid var(--border); border-radius: 6px;
+    overflow: hidden; background: var(--surface);
+  }
+  .info-cell {
+    flex: 1; padding: 12px 18px;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .info-cell:last-child { border-right: none; }
+  .info-label {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim);
+  }
+  .info-value { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--cyan); }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 18px; margin-top: 36px;
+  }
+  .section-header:first-of-type { margin-top: 0; }
+  .section-header .label {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--text-dim); white-space: nowrap;
+  }
+  .section-header::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── CONCEPT CARDS ── */
+  .concept-grid {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .concept-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+    position: relative;
+    animation: slideUp 0.4s ease both;
+  }
+  .concept-card::before {
+    content: ''; position: absolute;
+    left: 0; top: 0; bottom: 0; width: 2px;
+    background: var(--card-color, var(--blue));
+    opacity: 0.7;
+  }
+
+  .card-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px; cursor: pointer;
+    transition: background 0.2s;
+    gap: 16px;
+  }
+  .card-header:hover { background: var(--surface2); }
+
+  .card-left { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; }
+  .card-index {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--text-dim); min-width: 22px; flex-shrink: 0;
+  }
+  .card-title-wrap { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .card-title {
+    font-family: 'DM Sans', sans-serif; font-size: 15px;
+    font-weight: 500; color: var(--text);
+  }
+  .card-subtitle {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--text-mid); font-weight: 300;
+  }
+  .card-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .card-tag {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 3px;
+    border: 1px solid var(--border); color: var(--text-dim); background: var(--bg);
+  }
+  .card-chevron {
+    font-size: 13px; color: var(--blue); opacity: 0.5;
+    transition: transform 0.3s, opacity 0.2s;
+  }
+  .concept-card.open .card-chevron { transform: rotate(90deg); opacity: 1; }
+
+  .card-body {
+    display: none; padding: 0 20px 20px 58px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .concept-card.open .card-body { display: block; }
+
+  /* ── BODY CONTENT STYLES ── */
+  .card-body p {
+    font-size: 14px; color: var(--text-mid); line-height: 1.75;
+    margin-top: 14px;
+  }
+  .card-body strong { color: var(--text); font-weight: 500; }
+
+  .card-body ul, .card-body ol {
+    margin-top: 10px; padding-left: 18px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .card-body li {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--text-mid); line-height: 1.6;
+  }
+  .card-body li strong { color: var(--cyan); }
+
+  .math-block {
+    margin: 14px 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--card-color, var(--blue));
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--yellow);
+    overflow-x: auto;
+    white-space: pre;
+    letter-spacing: 0.02em;
+  }
+
+  .data-table {
+    width: 100%; margin-top: 14px;
+    border-collapse: collapse; font-family: 'DM Mono', monospace; font-size: 11px;
+  }
+  .data-table th {
+    padding: 7px 12px; text-align: left;
+    border-bottom: 1px solid var(--border-bright);
+    color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase;
+    font-weight: 400;
+  }
+  .data-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-mid); vertical-align: top;
+  }
+  .data-table td:first-child { color: var(--cyan); }
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .tag-row {
+    display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px;
+  }
+  .tag-pill {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 3px;
+    border: 1px solid var(--border-bright);
+    color: var(--text-mid); background: var(--bg);
+  }
+  .tag-pill.highlight { color: var(--card-color, var(--blue)); border-color: var(--card-color, var(--blue)); }
+
+  /* ── INTERACTIVE DEMOS ── */
+  .demo-box {
+    margin-top: 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px; overflow: hidden;
+  }
+  .demo-title {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--text-dim); padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .demo-inner { padding: 14px; }
+
+  canvas.demo-canvas {
+    display: block; width: 100%; border-radius: 4px;
+    image-rendering: pixelated;
+  }
+
+  .slider-row {
+    display: flex; align-items: center; gap: 12px; margin-top: 10px;
+  }
+  .slider-label {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--text-dim); min-width: 90px;
+  }
+  .slider-val {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--cyan); min-width: 32px; text-align: right;
+  }
+  input[type=range] {
+    flex: 1; appearance: none; background: var(--border);
+    height: 3px; border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--blue); cursor: pointer;
+  }
+
+  /* ── SUMMARY TABLE SECTION ── */
+  .summary-table {
+    position: relative; z-index: 1;
+    width: 100%; margin-top: 10px;
+    border-collapse: collapse;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  .summary-table th {
+    padding: 10px 14px; text-align: left;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border-bright);
+    color: var(--text-dim); letter-spacing: 0.18em; text-transform: uppercase;
+    font-weight: 400;
+  }
+  .summary-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-mid); vertical-align: top;
+    line-height: 1.55;
+  }
+  .summary-table td:first-child { color: var(--cyan); font-weight: 500; }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table tr:hover td { background: var(--surface2); }
+
+  /* ── FOOTER ── */
+  .footer {
+    position: relative; z-index: 1;
+    margin-top: 56px; padding-top: 18px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer-text {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--text-dim); letter-spacing: 0.12em;
+  }
+
+  /* ── ANIMATIONS ── */
+  .scan-header, .meta-strip, .info-bar { animation: slideUp 0.5s ease both; }
+  .scan-header { animation-delay: 0.0s; }
+  .meta-strip  { animation-delay: 0.05s; }
+  .info-bar    { animation-delay: 0.1s; }
+
+  .concept-card:nth-child(1) { animation-delay: 0.18s; }
+  .concept-card:nth-child(2) { animation-delay: 0.26s; }
+  .concept-card:nth-child(3) { animation-delay: 0.34s; }
+  .concept-card:nth-child(4) { animation-delay: 0.42s; }
+  .concept-card:nth-child(5) { animation-delay: 0.50s; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- SCAN HEADER -->
+<div class="scan-header">
+  <canvas id="scanCanvas"></canvas>
+</div>
+
+<!-- META STRIP -->
+<div class="meta-strip">
+  <div class="meta-left">
+    <div class="institution">UIUC · BIOE 484 · Lectures 17–18</div>
+    <h1>Image<br><span>Segmentation</span></h1>
+  </div>
+  <div class="meta-right">
+    <div class="meta-tag">NAME <span>Frank Lato</span></div>
+    <div class="meta-tag">METHODS <span>5</span></div>
+    <div class="meta-tag">TERM <span>Spring 2026</span></div>
+  </div>
+</div>
+
+<!-- INFO BAR -->
+<div class="info-bar">
+  <div class="info-cell">
+    <div class="info-label">Course</div>
+    <div class="info-value">BIOE 484</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-label">Topic</div>
+    <div class="info-value">Segmentation</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-label">Lectures</div>
+    <div class="info-value">17 – 18</div>
+  </div>
+  <div class="info-cell">
+    <div class="info-label">Format</div>
+    <div class="info-value" style="color:var(--green)">Interactive</div>
+  </div>
+</div>
+
+<!-- SECTION: CONCEPTS -->
+<div class="section-header"><span class="label">Core Concepts</span></div>
+
+<div class="concept-grid">
+
+  <!-- CARD 1: What is Segmentation -->
+  <div class="concept-card" style="--card-color: #7de8f5">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-left">
+        <span class="card-index">01</span>
+        <div class="card-title-wrap">
+          <div class="card-title">What Is Image Segmentation?</div>
+          <div class="card-subtitle">partition pixels into coherent, meaningful regions</div>
+        </div>
+      </div>
+      <div class="card-right">
+        <span class="card-tag">Overview</span>
+        <span class="card-chevron">›</span>
+      </div>
+    </div>
+    <div class="card-body" style="--card-color: #7de8f5">
+      <p><strong>Goal:</strong> Identify groups of pixels that "go together" — partition an image into regions corresponding to meaningful objects or structures.</p>
+      <p>In biomedical imaging this is critical: you can't measure tumor volume, quantify gray matter, or track a carotid artery without first <strong>delineating the structure</strong>.</p>
+
+      <p><strong>Types of segmentation results:</strong></p>
+      <ul>
+        <li><strong>Oversegmentation</strong> — too many regions; correct objects are split</li>
+        <li><strong>Undersegmentation</strong> — too few regions; distinct objects are merged</li>
+        <li><strong>Multiple segmentations</strong> — a range of plausible results at different granularities</li>
+      </ul>
+
+      <p><strong>Limitations of manual segmentation:</strong></p>
+      <ul>
+        <li>Extremely slow — up to <strong>60 hours per scan</strong></li>
+        <li>High inter-rater variability — up to <strong>15% disagreement</strong> between expert annotators [Warfield]</li>
+      </ul>
+
+      <div class="tag-row">
+        <span class="tag-pill highlight">Biomedical</span>
+        <span class="tag-pill highlight">Partition</span>
+        <span class="tag-pill">Inter-rater Variability</span>
+        <span class="tag-pill">Over/Underseg.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 2: Thresholding -->
+  <div class="concept-card" style="--card-color: #a6e3a1">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-left">
+        <span class="card-index">02</span>
+        <div class="card-title-wrap">
+          <div class="card-title">Thresholding &amp; Histogram Methods</div>
+          <div class="card-subtitle">global · local (adaptive) · GMM · Otsu</div>
+        </div>
+      </div>
+      <div class="card-right">
+        <span class="card-tag">Thresholding</span>
+        <span class="card-chevron">›</span>
+      </div>
+    </div>
+    <div class="card-body" style="--card-color: #a6e3a1">
+      <p>The simplest approach: assign each pixel to foreground/background based on its intensity vs. threshold <strong>τ</strong>.</p>
+
+      <div class="math-block">f(x,y) = { 1  if I(x,y) ≥ τ
+           { 0  otherwise</div>
+
+      <p><strong>When it works:</strong> segmenting a single object class (e.g., all bone in CT).</p>
+      <p><strong>When it fails:</strong> multiple objects of similar intensity, uneven illumination.</p>
+
+      <p style="margin-top:14px;"><strong>Global vs. Local Thresholding</strong></p>
+      <p>A single global threshold breaks down with non-uniform illumination (e.g., fluorescence microscopy). <strong>Local (adaptive) thresholding</strong> computes a different threshold per region:</p>
+      <ul>
+        <li><strong>Block thresholding</strong> — partition into rectangular blocks, one threshold per block</li>
+        <li><strong>Moving window</strong> — slower but smoother; threshold at each pixel from local neighborhood</li>
+      </ul>
+
+      <p style="margin-top:14px;"><strong>Automatic Threshold via Histogram</strong></p>
+      <p>The histogram often shows two peaks (background / foreground) separated by a valley. Strategy: fit Gaussians (GMM) and use their <strong>intersection as threshold</strong>.</p>
+      <p><em>Key limitation:</em> number of Gaussians to fit requires prior knowledge of tissue classes.</p>
+
+      <!-- Interactive Threshold Demo -->
+      <div class="demo-box">
+        <div class="demo-title">// Interactive · Threshold Demo</div>
+        <div class="demo-inner">
+          <canvas id="threshCanvas" class="demo-canvas" height="80"></canvas>
+          <div class="slider-row">
+            <span class="slider-label">Threshold τ</span>
+            <input type="range" id="threshSlider" min="0" max="255" value="128" oninput="updateThresh()">
+            <span class="slider-val" id="threshVal">128</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tag-row">
+        <span class="tag-pill highlight">GMM</span>
+        <span class="tag-pill highlight">Otsu's Method</span>
+        <span class="tag-pill">Adaptive</span>
+        <span class="tag-pill">Histogram</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 3: CCA -->
+  <div class="concept-card" style="--card-color: #f9e2af">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-left">
+        <span class="card-index">03</span>
+        <div class="card-title-wrap">
+          <div class="card-title">Connected Component Analysis (CCA)</div>
+          <div class="card-subtitle">label disconnected blobs · 2-pass algorithm · equivalence table</div>
+        </div>
+      </div>
+      <div class="card-right">
+        <span class="card-tag">CCA</span>
+        <span class="card-chevron">›</span>
+      </div>
+    </div>
+    <div class="card-body" style="--card-color: #f9e2af">
+      <p>Thresholding gives a binary image but doesn't distinguish <em>which</em> foreground pixels belong to <em>which</em> object. CCA solves this.</p>
+      <p><strong>Core idea:</strong> Two pixels belong to the same object if connected through a chain of foreground pixels (not separated by background).</p>
+
+      <p style="margin-top:12px;"><strong>Two-Pass Algorithm</strong></p>
+      <ol>
+        <li><strong>Pass 1</strong> — scan top-to-bottom, left-to-right. At each foreground pixel, examine already-scanned neighbors:
+          <ul style="margin-top:6px;">
+            <li>All 0 → assign a <strong>new label</strong></li>
+            <li>Exactly one neighbor is 1 → assign that neighbor's label</li>
+            <li>Multiple neighbors, different labels → assign one; record <strong>equivalence</strong></li>
+          </ul>
+        </li>
+        <li><strong>Pass 2</strong> — merge equivalent labels so all pixels in the same region share one label.</li>
+      </ol>
+
+      <p>The <strong>equivalence table</strong> tracks which provisional labels refer to the same component and collapses them.</p>
+
+      <!-- CCA Demo -->
+      <div class="demo-box">
+        <div class="demo-title">// Interactive · CCA Labeling Demo</div>
+        <div class="demo-inner">
+          <canvas id="ccaCanvas" class="demo-canvas" height="120"></canvas>
+          <div class="slider-row" style="margin-top:10px;">
+            <span class="slider-label" style="min-width:110px">Blob density</span>
+            <input type="range" id="ccaDensity" min="5" max="40" value="18" oninput="updateCCA()">
+            <span class="slider-val" id="ccaDensityVal">18</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tag-row">
+        <span class="tag-pill highlight">2-Pass Scan</span>
+        <span class="tag-pill highlight">Equivalence Table</span>
+        <span class="tag-pill">4-Connectivity</span>
+        <span class="tag-pill">Binary Input</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 4: Active Contours -->
+  <div class="concept-card" style="--card-color: #f38ba8">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-left">
+        <span class="card-index">04</span>
+        <div class="card-title-wrap">
+          <div class="card-title">Active Contours (Snakes)</div>
+          <div class="card-subtitle">energy minimization · internal + external · Kass 1987</div>
+        </div>
+      </div>
+      <div class="card-right">
+        <span class="card-tag">Snakes</span>
+        <span class="card-chevron">›</span>
+      </div>
+    </div>
+    <div class="card-body" style="--card-color: #f38ba8">
+      <p><strong>Motivation:</strong> Many real biomedical boundaries are partially invisible (e.g., carotid artery in ultrasound). Thresholding or edge detection alone will fail — you need to <em>"hallucinate"</em> missing boundaries guided by shape priors.</p>
+      <p><em>Seminal paper: Kass, Witkin &amp; Terzopoulos · Snakes: Active Contour Models · ICCV 1987</em></p>
+
+      <p style="margin-top:12px;"><strong>Three-Step Process</strong></p>
+      <ol>
+        <li><strong>Initialize</strong> the contour near the target</li>
+        <li><strong>Evolve</strong> — iteratively move each vertex to reduce total energy ("wiggling snake")</li>
+        <li><strong>Stop</strong> — when contour aligns with boundary (energy minimum)</li>
+      </ol>
+
+      <p style="margin-top:12px;"><strong>Contour Representation</strong></p>
+      <p>Discrete parametric: a list of N 2D vertices  v = {(x₁,y₁), ..., (xₙ,yₙ)}</p>
+
+      <p style="margin-top:12px;"><strong>Energy Function</strong></p>
+      <div class="math-block">E_total = E_external + E_internal
+
+E_external(vᵢ) = -|∇I(vᵢ)|²        ← attracted to edges (high gradient)
+
+E_internal = α·Σ|vᵢ - vᵢ₋₁|²       ← tension / elasticity
+           + β·Σ|vᵢ₊₁ - 2vᵢ + vᵢ₋₁|²  ← stiffness / curvature</div>
+
+      <table class="data-table" style="margin-top:10px;">
+        <tr><th>Term</th><th>Physical Meaning</th></tr>
+        <tr><td>α (high), β (low)</td><td>Elastic band — contracts toward center, resists stretching</td></tr>
+        <tr><td>α (low), β (high)</td><td>Stiff rod — resists bending, can stretch freely</td></tr>
+        <tr><td>E_external</td><td>Negative gradient mag. → low energy at image edges</td></tr>
+      </table>
+
+      <!-- Snake Demo -->
+      <div class="demo-box">
+        <div class="demo-title">// Interactive · Snake Energy Demo</div>
+        <div class="demo-inner">
+          <canvas id="snakeCanvas" class="demo-canvas" height="160"></canvas>
+          <div class="slider-row">
+            <span class="slider-label">α (tension)</span>
+            <input type="range" id="alphaSlider" min="0" max="100" value="40" oninput="updateSnake()">
+            <span class="slider-val" id="alphaVal">0.40</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label">β (stiffness)</span>
+            <input type="range" id="betaSlider" min="0" max="100" value="20" oninput="updateSnake()">
+            <span class="slider-val" id="betaVal">0.20</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="tag-row">
+        <span class="tag-pill highlight">Energy Min.</span>
+        <span class="tag-pill highlight">Shape Prior</span>
+        <span class="tag-pill">Greedy Search</span>
+        <span class="tag-pill">Dynamic Programming</span>
+        <span class="tag-pill">α / β Tuning</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARD 5: Atlas-Based -->
+  <div class="concept-card" style="--card-color: #cba6f7">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-left">
+        <span class="card-index">05</span>
+        <div class="card-title-wrap">
+          <div class="card-title">Atlas-Based Segmentation</div>
+          <div class="card-subtitle">probabilistic atlas · Bayesian MAP · multi-tissue</div>
+        </div>
+      </div>
+      <div class="card-right">
+        <span class="card-tag">Bayesian</span>
+        <span class="card-chevron">›</span>
+      </div>
+    </div>
+    <div class="card-body" style="--card-color: #cba6f7">
+      <p>When you have strong anatomical prior knowledge — e.g., all healthy brains have gray matter, white matter, and CSF in predictable spatial locations — bake that into segmentation as a <strong>probabilistic atlas</strong>.</p>
+
+      <p style="margin-top:12px;"><strong>Probabilistic Atlas</strong></p>
+      <p>An atlas encodes the spatial distribution of anatomical structures across a population:</p>
+      <div class="math-block">P(label = k | position x)
+
+where k ∈ {gray matter, white matter, CSF, ...}
+Constraint: Σₖ P(label = k | x) = 1  at every voxel</div>
+
+      <p><strong>How to build an atlas:</strong></p>
+      <ol>
+        <li>Gather population images of the same organ/anatomy</li>
+        <li>Obtain manual expert annotations for each image</li>
+        <li>Register all images to a common coordinate space</li>
+        <li>Compute label distribution at each voxel across subjects</li>
+      </ol>
+
+      <p style="margin-top:12px;"><strong>Bayesian MAP Segmentation</strong></p>
+      <div class="math-block">label*(x) = argmax_k  P(I(x) | label=k) · P(label=k | x)
+                           ──────────────   ────────────────
+                             Likelihood         Atlas Prior</div>
+
+      <p>This balances two extremes: pure atlas (ignores image data) vs. pure thresholding (ignores anatomy).</p>
+
+      <table class="data-table" style="margin-top:10px;">
+        <tr><th>Approach</th><th>Multi-Class?</th><th>Uses Prior Anatomy?</th></tr>
+        <tr><td>Threshold-based</td><td>Coarse (binary)</td><td>No</td></tr>
+        <tr><td>Atlas-based (Bayesian)</td><td>Yes</td><td>Yes</td></tr>
+      </table>
+
+      <div class="tag-row">
+        <span class="tag-pill highlight">MAP Estimate</span>
+        <span class="tag-pill highlight">Likelihood × Prior</span>
+        <span class="tag-pill">Registration</span>
+        <span class="tag-pill">Brain MRI</span>
+        <span class="tag-pill">Multi-class</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end concept-grid -->
+
+<!-- SUMMARY TABLE -->
+<div class="section-header" style="margin-top:40px;"><span class="label">Method Comparison</span></div>
+<table class="summary-table">
+  <tr>
+    <th>Method</th><th>Key Idea</th><th>Strength</th><th>Weakness</th>
+  </tr>
+  <tr>
+    <td>Thresholding</td>
+    <td>Pixel intensity vs. τ</td>
+    <td>Simple, fast</td>
+    <td>No shape/context; fails with intensity variation</td>
+  </tr>
+  <tr>
+    <td>Local Thresholding</td>
+    <td>Block/window adaptive τ</td>
+    <td>Handles uneven illumination</td>
+    <td>Still no shape prior</td>
+  </tr>
+  <tr>
+    <td>CCA</td>
+    <td>Label disconnected blobs</td>
+    <td>Separates individual objects</td>
+    <td>Requires clean binary input</td>
+  </tr>
+  <tr>
+    <td>Active Contours</td>
+    <td>Deform curve to minimize E_image + E_shape</td>
+    <td>Handles missing edges; enforces shape</td>
+    <td>Needs good initialization; local minima</td>
+  </tr>
+  <tr>
+    <td>Atlas-Based (Bayesian)</td>
+    <td>Prior probability maps + image likelihood</td>
+    <td>Multi-class, anatomically informed</td>
+    <td>Requires atlas construction; registration needed</td>
+  </tr>
+</table>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-text">// Frank Lato · BIOE 484 Lec 17–18 · Generated with Claude</div>
+  <div class="footer-text" id="timestamp"></div>
+</div>
+
+<script>
+// ─── TIMESTAMP ──────────────────────────────────────────────────────────────
+document.getElementById('timestamp').textContent = new Date().toISOString().slice(0,10);
+
+// ─── SCAN CANVAS ────────────────────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('scanCanvas');
+  const ctx = canvas.getContext('2d');
+  function resize() {
+    canvas.width  = canvas.offsetWidth  * window.devicePixelRatio;
+    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Segmentation-themed profile: blocky regions like a tissue histogram
+  function profile(x, w) {
+    const t = x / w;
+    const peaks = [
+      {c:0.08,a:0.55,s:0.050},{c:0.22,a:0.35,s:0.035},
+      {c:0.38,a:0.80,s:0.080},{c:0.55,a:0.45,s:0.045},
+      {c:0.70,a:0.65,s:0.060},{c:0.84,a:0.30,s:0.038},{c:0.93,a:0.50,s:0.052}
+    ];
+    return peaks.reduce((s,p) => { const d=t-p.c; return s + p.a*Math.exp(-(d*d)/(2*p.s*p.s)); }, 0.05);
+  }
+
+  let scanX = 0;
+  function draw() {
+    const w = canvas.offsetWidth, h = canvas.offsetHeight, dpr = window.devicePixelRatio;
+    ctx.save(); ctx.scale(dpr, dpr);
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#0c0e18'; ctx.fillRect(0,0,w,h);
+
+    const prof = Array.from({length:w},(_,x)=>profile(x,w));
+
+    // threshold line
+    const tauY = h * 0.45;
+    ctx.setLineDash([4,6]);
+    ctx.strokeStyle='rgba(249,226,175,0.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,tauY); ctx.lineTo(w,tauY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // region fills - color segments above threshold differently
+    let inRegion = false;
+    const colors = ['rgba(74,158,255,0.14)','rgba(125,232,245,0.14)','rgba(166,227,161,0.14)','rgba(203,166,247,0.14)'];
+    let colorIdx = 0;
+    ctx.beginPath(); ctx.moveTo(0,h);
+    for (let x=0;x<w;x++) {
+      const y = h - prof[x]*h*0.78;
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.lineTo(w,h); ctx.closePath();
+    ctx.fillStyle='rgba(74,158,255,0.12)'; ctx.fill();
+
+    // curve
+    ctx.beginPath();
+    for (let x=0;x<w;x++) {
+      const y = h - prof[x]*h*0.78;
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle='rgba(74,158,255,0.55)'; ctx.lineWidth=1.5; ctx.stroke();
+
+    // tick marks
+    ctx.strokeStyle='rgba(74,158,255,0.18)'; ctx.lineWidth=1;
+    for (let x=0;x<w;x+=28) {
+      const th = x%140===0?9:5;
+      ctx.beginPath(); ctx.moveTo(x,h); ctx.lineTo(x,h-th); ctx.stroke();
+    }
+
+    // scan line
+    scanX = (scanX+0.7)%(w+60);
+    const cx = scanX-30;
+    const sg = ctx.createLinearGradient(cx-24,0,cx+24,0);
+    sg.addColorStop(0,'rgba(125,232,245,0)');
+    sg.addColorStop(0.5,'rgba(125,232,245,0.55)');
+    sg.addColorStop(1,'rgba(125,232,245,0)');
+    ctx.fillStyle=sg; ctx.fillRect(cx-24,0,48,h);
+    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,h);
+    ctx.strokeStyle='rgba(125,232,245,0.75)'; ctx.lineWidth=1; ctx.stroke();
+
+    ctx.restore();
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ─── ACCORDION ──────────────────────────────────────────────────────────────
+function toggleCard(header) {
+  const card = header.closest('.concept-card');
+  const wasOpen = card.classList.contains('open');
+  card.classList.toggle('open', !wasOpen);
+  if (!wasOpen) {
+    setTimeout(() => initDemos(), 50);
+  }
+}
+
+// ─── THRESHOLD DEMO ──────────────────────────────────────────────────────────
+let threshInitialized = false;
+let threshImageData = null;
+
+function initThreshDemo() {
+  if (threshInitialized) return;
+  threshInitialized = true;
+  const canvas = document.getElementById('threshCanvas');
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  updateThresh();
+}
+
+function updateThresh() {
+  initThreshDemo();
+  const canvas = document.getElementById('threshCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const tau = parseInt(document.getElementById('threshSlider').value);
+  document.getElementById('threshVal').textContent = tau;
+
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = '#07080f'; ctx.fillRect(0,0,w,h);
+
+  // Draw simulated image row (gradient + noise)
+  const halfH = Math.floor(h/2);
+
+  // Top half: simulated grayscale image
+  for (let x=0; x<w; x++) {
+    const base = Math.round((x/w)*200 + 30);
+    const noise = Math.round((Math.random()-0.5)*30);
+    const v = Math.max(0, Math.min(255, base+noise));
+    ctx.fillStyle = `rgb(${v},${v},${v})`;
+    ctx.fillRect(x, 0, 1, halfH-2);
+  }
+
+  // Label
+  ctx.fillStyle='rgba(74,158,255,0.6)';
+  ctx.font = `${Math.floor(9*window.devicePixelRatio)}px DM Mono`;
+  ctx.fillText('INTENSITY', 4, 11*window.devicePixelRatio);
+
+  // Bottom half: thresholded result
+  for (let x=0; x<w; x++) {
+    const base = Math.round((x/w)*200 + 30);
+    const noise = 0; // stable
+    const v = base+noise;
+    const scaled_tau = tau;
+    ctx.fillStyle = v >= scaled_tau ? 'rgba(166,227,161,1)' : 'rgba(20,24,40,1)';
+    ctx.fillRect(x, halfH+2, 1, halfH-2);
+  }
+
+  // Threshold line
+  const tx = Math.round(((tau-30)/200)*w);
+  ctx.strokeStyle = 'rgba(249,226,175,0.9)';
+  ctx.lineWidth = window.devicePixelRatio;
+  ctx.setLineDash([4*window.devicePixelRatio, 3*window.devicePixelRatio]);
+  ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, h); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle='rgba(166,227,161,0.6)';
+  ctx.fillText('SEGMENTED', 4, (halfH+14)*window.devicePixelRatio);
+}
+
+// ─── CCA DEMO ────────────────────────────────────────────────────────────────
+let ccaInitialized = false;
+
+function initCCADemo() {
+  if (ccaInitialized) return;
+  ccaInitialized = true;
+  updateCCA();
+}
+
+function updateCCA() {
+  initCCADemo();
+  const canvas = document.getElementById('ccaCanvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const density = parseInt(document.getElementById('ccaDensity').value);
+  document.getElementById('ccaDensityVal').textContent = density;
+
+  ctx.fillStyle='#07080f'; ctx.fillRect(0,0,W,H);
+
+  // Simple random blobs using seeded positions
+  const colors = ['#4a9eff','#a6e3a1','#f38ba8','#cba6f7','#f9e2af','#fab387','#7de8f5'];
+  const rng = (seed) => { let s=seed; return ()=>{s=(s*16807)%2147483647; return(s-1)/2147483646;}; };
+  const rand = rng(density*7919);
+
+  const numBlobs = Math.round(density/3);
+  for (let i=0;i<numBlobs;i++) {
+    const cx = rand()*W, cy = rand()*H;
+    const r = (rand()*15+8)*window.devicePixelRatio;
+    const col = colors[i % colors.length];
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fill();
+
+    // Label
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#07080f';
+    ctx.font = `bold ${Math.floor(8*window.devicePixelRatio)}px DM Mono`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(`C${i+1}`, cx, cy);
+  }
+  ctx.globalAlpha=1;
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
+
+// ─── SNAKE DEMO ──────────────────────────────────────────────────────────────
+let snakeInitialized = false;
+let snakeAngle = 0;
+
+function initSnakeDemo() {
+  if (snakeInitialized) return;
+  snakeInitialized = true;
+  drawSnake();
+}
+
+function updateSnake() {
+  initSnakeDemo();
+  drawSnake();
+}
+
+function drawSnake() {
+  const canvas = document.getElementById('snakeCanvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const dpr = window.devicePixelRatio;
+
+  const alpha = parseInt(document.getElementById('alphaSlider').value)/100;
+  const beta  = parseInt(document.getElementById('betaSlider').value)/100;
+  document.getElementById('alphaVal').textContent = alpha.toFixed(2);
+  document.getElementById('betaVal').textContent  = beta.toFixed(2);
+
+  ctx.fillStyle='#07080f'; ctx.fillRect(0,0,W,H);
+
+  // Draw target "object" — a blurry oval (the boundary we want to find)
+  const cx = W/2, cy = H/2;
+  const rx = W*0.28, ry = H*0.32;
+  const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(rx,ry));
+  grad.addColorStop(0, 'rgba(74,158,255,0.3)');
+  grad.addColorStop(0.6,'rgba(74,158,255,0.1)');
+  grad.addColorStop(1,  'rgba(74,158,255,0)');
+  ctx.fillStyle=grad;
+  ctx.beginPath();
+  ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+  ctx.fill();
+
+  // Draw contour — shape affected by alpha/beta
+  const N = 40;
+  // alpha → pull inward (tension), beta → smooth
+  const stretch = 1 - alpha*0.5; // high alpha = tighter
+  const smoothing = beta * 0.3;
+
+  const pts = [];
+  for (let i=0;i<N;i++) {
+    const angle = (i/N)*Math.PI*2;
+    // Add controlled irregularity reduced by beta (stiffness)
+    const noise = (1-beta)*(Math.sin(angle*3)*0.12 + Math.cos(angle*5)*0.08);
+    const r_scale = stretch + noise;
+    pts.push({
+      x: cx + rx*(r_scale+0.15)*Math.cos(angle),
+      y: cy + ry*(r_scale+0.15)*Math.sin(angle)
+    });
+  }
+
+  // Draw snake
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i=1;i<=N;i++) {
+    ctx.lineTo(pts[i%N].x, pts[i%N].y);
+  }
+  ctx.strokeStyle='rgba(243,139,168,0.9)';
+  ctx.lineWidth = 2*dpr;
+  ctx.stroke();
+
+  // Draw vertices
+  ctx.fillStyle='rgba(243,139,168,0.7)';
+  for (let p of pts) {
+    ctx.beginPath(); ctx.arc(p.x,p.y,2.5*dpr,0,Math.PI*2); ctx.fill();
+  }
+
+  // Target boundary (ideal)
+  ctx.beginPath();
+  ctx.ellipse(cx,cy,rx*0.88,ry*0.88,0,0,Math.PI*2);
+  ctx.strokeStyle='rgba(125,232,245,0.3)';
+  ctx.lineWidth=dpr;
+  ctx.setLineDash([4*dpr,4*dpr]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.font=`${9*dpr}px DM Mono`;
+  ctx.fillStyle='rgba(243,139,168,0.7)';
+  ctx.fillText('SNAKE CONTOUR', 4*dpr, 14*dpr);
+  ctx.fillStyle='rgba(125,232,245,0.5)';
+  ctx.fillText('TARGET BOUNDARY', 4*dpr, 26*dpr);
+}
+
+// ─── INIT ALL DEMOS ──────────────────────────────────────────────────────────
+function initDemos() {
+  // Check which cards are open and init their demos
+  const cards = document.querySelectorAll('.concept-card.open');
+  cards.forEach(card => {
+    const idx = card.querySelector('.card-index').textContent;
+    if (idx === '02') initThreshDemo();
+    if (idx === '03') initCCADemo();
+    if (idx === '04') initSnakeDemo();
+  });
+}
+
+// Re-draw on resize
+window.addEventListener('resize', () => {
+  if (threshInitialized) { threshInitialized=false; updateThresh(); }
+  if (ccaInitialized)    { ccaInitialized=false;    updateCCA(); }
+  if (snakeInitialized)  { snakeInitialized=false;  drawSnake(); }
+});
+</script>
+</body>
+</html>
